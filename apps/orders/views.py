@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, View
 from django.forms import HiddenInput, inlineformset_factory
 from apps.inventory.models import Item
-from apps.core.models import Customer
+from apps.core.models import Customer, Company
 from .models import Order, OrderBatch, OrderItem
 from .forms import OrderItemFormSet, BatchItemFormSet, OrderForm, OrderBatchForm, OrderItemsImportForm
 
@@ -26,7 +26,7 @@ class OrderListView(ListView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         # lista todos os clientes para o filtro
-        ctx['customers'] = Customer.objects.order_by('name')
+        ctx['company'] = Company.objects.order_by('name')
         return ctx   
 
 

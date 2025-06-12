@@ -1,0 +1,29 @@
+{# templates/orders/new_order_import.html #}
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="display-6">Importar Itens na Nova Venda</h3>
+  <div class="card">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ import_form.non_field_errors }}
+        <div class="mb-3">
+          {{ import_form.file.label_tag }}
+          {{ import_form.file }}
+          {% for err in import_form.file.errors %}
+            <div class="invalid-feedback d-block">{{ err }}</div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-upload"></i> Carregar Itens
+        </button>
+        <a href="{% url 'orders:order-add' %}" class="btn btn-secondary ms-2">
+            <i class="bi bi-arrow-left"></i> Voltar
+          </a>  
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

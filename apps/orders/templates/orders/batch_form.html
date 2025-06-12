@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Novo Lote{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="display-6">Criar Lote para Ordem #{{ order.pk }}</h3>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post" id="batch-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        <div class="card mt-4">
+          <div class="card-header fw-bold">Itens para Embarque</div>
+          <div class="card-body">
+            {{ batch_items_fs.management_form }}
+
+            <div class="row fw-bold mb-2">
+              <div class="col-6">Item (da Ordem)</div>
+              <div class="col-2">Qtd. a Emb. </div>
+              <div class="col-2">Ações</div>
+            </div>
+
+            <div id="batch-items-grid">
+              {% for f in batch_items_fs.forms %}
+                <div class="row mb-2 item-row align-items-center">
+                  {% for hidden in f.hidden_fields %}
+                    {{ hidden }}
+                  {% endfor %}
+                  <div class="col-6">{{ f.order_item }}</div>
+                  <div class="col-2">{{ f.quantity }}</div>
+                  <div class="col-2">
+                    <button type="button" class="btn btn-sm btn-danger remove-row">
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+
+            <button type="button" id="add-batch-item" class="btn btn-primary mt-2">
+              Adicionar Item ao Lote
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success mt-3">Salvar Lote</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# Template oculto, parecido com o empty_form do formset #}
+<div id="empty-batch-item-template" class="d-none">
+  <div class="row mb-2 item-row align-items-center">
+    {% for hidden in batch_items_fs.empty_form.hidden_fields %}
+      {{ hidden }}
+    {% endfor %}
+    <div class="col-6">{{ batch_items_fs.empty_form.order_item }}</div>
+    <div class="col-2">{{ batch_items_fs.empty_form.quantity }}</div>
+    <div class="col-2">
+      <button type="button" class="btn btn-sm btn-danger remove-row">
+        Remover
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/formsets.js' %}"></script>
+{% endblock %}

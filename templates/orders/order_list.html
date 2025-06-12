@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+Vendas
+{% endblock %}
+
+{% block content %}
+
+
+<div class="row mb-4"></div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <form method="get" action="{% url 'orders:order-list' %}">
+            <div class="input-group">
+                <input type="text" class="form-control" name="customer" placeholder="Cliente" value="{{ request.GET.customer }}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"> Pesquisar</i>
+                </button>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-6">
+        <a href="{% url 'orders:order-add' %}" class="btn btn-success float-end">
+            <i class="bi bi-plus"></i>
+            Nova Venda
+        </a>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <form method="get" action="{% url 'orders:order-list' %}">
+            <div class="input-group">
+                 <select class="form-select" name="customer">
+                    <option value="" {% if not request.GET.supplier %} selected {% endif %}>Todos os fornecedores</option>
+                    {% for supplier in suppliers %}
+                        <option value="{{ customer.id }}" {% if request.GET.customer == customer.id %} selected {% endif %}>{{ customer.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-filter"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+
+<div class = "table-responsive">
+    <table class="table table-hover table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>Exportador</th>
+                <th>Companhia</th>
+                <th>Criada em</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.id }}</td>
+                <td>{{ order.customer }}</td>
+                <td>{{ order.exporter }}</td>
+                <td>{{ order.company }}</td>
+                <td>{{ order.created_at }}</td>
+                <td>
+                    <a href="{% url 'orders:order-edit' order.id %}" class="btn btn-warning btn-sm">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% include 'components/_pagination.html' %}
+
+{% endblock %}

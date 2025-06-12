@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Lotes da Ordem #{{ order.pk }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Lotes da Ordem #{{ order.pk }}</h3>
+    <a href="{% url 'orders:batch-add' order.pk %}" class="btn btn-primary">+ Novo Lote</a>
+  </div>
+
+  {% if batches %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Código</th><th>Status</th><th>Criado em</th><th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in batches %}
+      <tr>
+        <td>{{ b.batch_code }}</td>
+        <td>{{ b.get_status_display }}</td>
+        <td>{{ b.created_at|date:"d/m/Y H:i" }}</td>
+        <td>
+          <!-- futuramente: link para editar/exibir detalhes -->
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div class="alert alert-info">Nenhum lote criado para esta ordem.</div>
+  {% endif %}
+</div>
+{% endblock %}

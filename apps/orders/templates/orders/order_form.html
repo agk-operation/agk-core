@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+  {% if object %}Editar Ordem #{{ object.pk }}{% else %}Nova Ordem{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="display-6">
+    {% if object %}Editar{% else %}Nova{% endif %} Ordem
+  </h3>
+
+  <div class="card">
+    <div class="card-body">
+
+      <form method="post" id="order-form" novalidate>
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        {# ——— Bloco de Lotes (só se já existir uma ordem) ——— #}
+        {% if object %}
+        <div class="card mt-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Lotes da Ordem</span>
+            <a href="{% url 'orders:batch-add' object.pk %}" class="btn btn-sm btn-success">
+              + Novo Lote
+            </a>
+          </div>
+          <div class="card-body p-0">
+            {% if object.batches.exists %}
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Código</th>
+                  <th>Status</th>
+                  <th>Criado em</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for lote in object.batches.all %}
+                <tr>
+                  <td>{{ lote.batch_code }}</td>
+                  <td>{{ lote.get_status_display }}</td>
+                  <td>{{ lote.created_at|date:"d/m/Y H:i" }}</td>
+                  <td>
+                    <a href="{% url 'orders:batch-list' object.pk %}"
+                       class="btn btn-sm btn-outline-primary">
+                      Ver Lotes
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info mb-0">Nenhum lote criado.</div>
+            {% endif %}
+          </div>
+          <div class="card-footer border-0 bg-white">
+             <!-- botões, legendas, etc -->
+          </div>
+        </div>
+        {% endif %}
+
+        {# ——— Bloco de Itens da Ordem ——— #}
+        {{ items_formset.management_form }}
+        <div class="card mt-4">
+          <div class="card-header fw-bold">
+            Itens da Ordem
+            <button
+              type="submit"
+              class="btn btn-outline-primary float-end"
+              formmethod="get"
+              formaction="{% url 'orders:order-item-import-new' %}"
+            >
+              <i class="bi bi-upload"></i> Importar Itens
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table  mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th>Quantidade</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="items-grid">
+                {% for subform in items_formset.forms %}
+                <tr class="item-row align-middle">
+                  {% for hidden in subform.hidden_fields %}
+                    {{ hidden }}
+                  {% endfor %}
+                  <td>{{ subform.item }}</td>
+                  <td>{{ subform.quantity }}</td>
+                  <td>
+                    {% if subform.instance.pk %}
+                      {{ subform.DELETE }} <small>Excluir</small>
+                    {% else %}
+                      <button type="button" class="btn btn-sm btn-danger remove-row">
+                        Remover
+                      </button>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card-footer bg-white border-0">
+            <button type="button" id="add-item" class="btn btn-primary">
+              Adicionar Item
+            </button>
+          </div>
+        </div>
+        </div>
+        <div class="card-footer bg-white border-0">
+          <button type="submit" class="btn btn-success">
+            Salvar Ordem
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+{# ——— Template oculto para clonagem ——— #}
+<table class="d-none">
+  <tbody>
+    <tr id="empty-form-template" class="item-row align-middle">
+      {% for hidden in items_formset.empty_form.hidden_fields %}
+        {{ hidden }}
+      {% endfor %}
+      <td>{{ items_formset.empty_form.item }}</td>
+      <td>{{ items_formset.empty_form.quantity }}</td>
+      <td>
+        <button type="button" class="btn btn-sm btn-danger remove-row">
+          Remover
+        </button>
+      </td>
+    </tr>
+  </tbody>
+</table>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/order_formsets.js' %}"></script>
+  <script src="{% static 'js/import_order_item.js' %}"></script>
+{% endblock %}

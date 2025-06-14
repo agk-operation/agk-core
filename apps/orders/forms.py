@@ -1,5 +1,6 @@
 from django import forms
 from django.forms.models import BaseInlineFormSet, inlineformset_factory
+from django.db.models import Sum
 from .models import Order, OrderItem, OrderBatch, BatchItem
 
 
@@ -40,44 +41,57 @@ class BatchItemForm(forms.ModelForm):
         }
 
 
+
 class BaseBatchItemFormSet(BaseInlineFormSet):
     def clean(self):
         super().clean()
 
-        # 1) acumula totais por OrderItem e agrupa forms
+        # 1) calcula o total já embarcado por OrderItem (todos os batches anteriores)
+        shipped_qs = (
+            BatchItem.objects
+            .filter(batch__order=self.instance.order)
+            .values('order_item_id')
+            .annotate(shipped=Sum('quantity'))
+        )
+        shipped = {row['order_item_id']: row['shipped'] for row in shipped_qs}
+
+        # 2) acumula novas quantidades + previous, e agrupa forms por OrderItem
         totals = {}
         forms_per_item = {}
-        global_errors = []
         for form in self.forms:
-            # pula formulários marcados para deleção ou vazios
             if self.can_delete and form.cleaned_data.get('DELETE'):
                 continue
 
-            oi = form.cleaned_data.get('order_item')
+            oi  = form.cleaned_data.get('order_item')
             qty = form.cleaned_data.get('quantity')
             if not oi or qty is None:
                 continue
 
-            totals.setdefault(oi, 0)
+            prev = shipped.get(oi.pk, 0)
+            totals.setdefault(oi, prev)
             totals[oi] += qty
-
             forms_per_item.setdefault(oi, []).append(form)
 
-        # 2) para cada OrderItem que estourou, marca erro em cada form associado
+        # 3) valida e marca erros
+        has_error = False
         for oi, total in totals.items():
             if total > oi.quantity:
                 msg = (
-                    f'O total ({total}) para o item "{oi.item.name}" '
-                    f'ultrapassa o disponível ({oi.quantity}).'
+                    f'O total acumulado ({total}) ultrapassa o pedido '
+                    f'({oi.quantity}) para “{oi.item.name}”.'
                 )
-                global_errors.append('Erro nos')
+                # erro de campo em cada linha envolvida
                 for form in forms_per_item[oi]:
                     form.add_error('quantity', msg)
-        if global_errors:
-            raise forms.ValidationError(global_errors)
+                has_error = True
 
+        # 4) erro global simplificado
+        if has_error:
+            raise forms.ValidationError(
+                'Há itens com quantidade maior do que o disponível.'
+            )
 
-# agora use esse BaseFormSet na construção do seu inlineformset:
+# final inlineformset, referenciando o BaseBatchItemFormSet
 BatchItemFormSet = inlineformset_factory(
     OrderBatch, BatchItem,
     form=BatchItemForm,

@@ -5,29 +5,47 @@ from apps.core.models import Customer, Exporter, Company
 from apps.inventory.models import Item
 
 class Order(models.Model):
-    customer   = models.ForeignKey(Customer,  on_delete=models.PROTECT)
-    exporter   = models.ForeignKey(Exporter,  on_delete=models.PROTECT)
-    company    = models.ForeignKey(Company,   on_delete=models.PROTECT)
+    customer  = models.ForeignKey(Customer, on_delete=models.PROTECT)
+    exporter = models.ForeignKey(Exporter, on_delete=models.PROTECT)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def get_item_balances(self):
+        """
+        Retorna um queryset de OrderItem já anotado com:
+         - shipped: total já embarcado (soma de BatchItem.quantity)
+         - remaining: quantidade restante (order.quantity - shipped)
+        """
+        return (
+            self.order_items
+                .annotate(shipped_qty=Sum('batchitem__quantity'))
+                .annotate(
+                    shipped_qty=models.F('shipped_qty'),
+                    remaining=models.F('quantity') - models.F('shipped_qty')
+                )
+        )
 
     def __str__(self):
         return f"Ordem #{self.pk} - {self.customer.name}"
 
 class OrderItem(models.Model):
-    order    = models.ForeignKey(Order, related_name='order_items', on_delete=models.CASCADE)
-    item     = models.ForeignKey(Item,   on_delete=models.PROTECT)
+    order = models.ForeignKey(Order, related_name='order_items', on_delete=models.CASCADE)
+    item = models.ForeignKey(Item, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
 
     @property
-    def assigned_quantity(self):
-        # soma de todas as quantidades já lançadas em lotes (BatchItem)
-        return self.batch_items.aggregate(
-            total=Coalesce(Sum('quantity'), 0)
-        )['total']
+    def shipped_qty(self):
+        """Soma todas as quantidades já embarcadas neste OrderItem."""
+        shipped = (
+            self.batchitem_set
+                .aggregate(total=Sum('quantity'))['total']
+        )
+        return shipped or 0
 
     @property
-    def remaining_quantity(self):
-        return self.quantity - self.assigned_quantity
+    def remaining_qty(self):
+        """Quantidade que ainda resta embarcar."""
+        return self.quantity - self.shipped_qty
 
     def __str__(self):
         return f"{self.item.name} ({self.quantity})"
@@ -49,9 +67,9 @@ class OrderBatch(models.Model):
         return f"Lote {self.batch_code} — {self.get_status_display()}"
 
 class BatchItem(models.Model):
-    batch       = models.ForeignKey(OrderBatch, related_name='batch_items', on_delete=models.CASCADE)
-    order_item  = models.ForeignKey(OrderItem,  on_delete=models.PROTECT)
-    quantity    = models.PositiveIntegerField()
+    batch = models.ForeignKey(OrderBatch, related_name='batch_items', on_delete=models.CASCADE)
+    order_item = models.ForeignKey(OrderItem,  on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField()
 
     def __str__(self):
         return f"{self.order_item.item.name} ({self.quantity})"

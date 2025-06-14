@@ -366,6 +366,7 @@ class OrderBatchCreateView(CreateView):
             form.fields['order_item'].queryset = self.order.order_items.all()
 
         data['batch_items_fs'] = fs
+        data['balances'] = self.order.get_item_balances()
         return data
 
     def form_valid(self, form):

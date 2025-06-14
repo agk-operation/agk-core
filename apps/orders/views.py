@@ -3,10 +3,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, View
 from django.forms import HiddenInput, inlineformset_factory
+from django.db.models import Sum, F
+from django.db.models.functions import Coalesce
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from apps.inventory.models import Item
 from apps.core.models import Customer, Company
 from .models import Order, OrderBatch, OrderItem
-from .forms import OrderItemFormSet, BatchItemFormSet, OrderForm, OrderBatchForm, OrderItemsImportForm
+from .forms import OrderItemForm, OrderItemFormSet, BatchItemFormSet, OrderForm, OrderBatchForm, OrderItemsImportForm
 
 # —— ORDERS ——
 class OrderListView(ListView):
@@ -18,77 +22,111 @@ class OrderListView(ListView):
     def get_queryset(self):
         queryset = super().get_queryset().select_related('customer')
         customer = self.request.GET.get('customer')
+        company_id = self.request.GET.get('company')
         if customer:
             queryset = queryset.filter(customer__name__icontains=customer)
-
-        return  queryset 
+        
+        if company_id:
+            queryset = queryset.filter(company_id=company_id)
+            
+        return queryset
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         # lista todos os clientes para o filtro
-        ctx['company'] = Company.objects.order_by('name')
+        ctx['companies'] = Company.objects.order_by('name')
+        ctx['selected_company']  = self.request.GET.get('company')
         return ctx   
 
 
-class OrderCreateView(CreateView):
-    model         = Order
-    form_class    = OrderForm
-    template_name = 'orders/order_form.html'
-    success_url   = reverse_lazy('orders:order-list')
+class OrderItemsImportView(View):
+    """
+    Importa linhas de CSV/XLSX criando OrderItem em um Order já salvo.
+    """
+    template_name     = 'orders/order_items_import.html'
+    form_class        = OrderItemsImportForm
 
-    def get_initial(self):
-        initial = super().get_initial()
-        # 1) Pega dados principais da sessão, se houver
-        order_data = self.request.session.pop(
-            NewOrderItemsImportView.session_data_key, None
-        )
-        if order_data:
-            initial.update(order_data)
-        return initial
+    def dispatch(self, request, *args, **kwargs):
+        # carrega a ordem existente
+        self.order = get_object_or_404(Order, pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+    def get(self, request, *args, **kwargs):
+        form = self.form_class()
+        return render(request, self.template_name, {
+            'import_form': form,
+            'order':       self.order,
+        })
 
-        # 2) Prepara o formset de itens
-        # sempre usando o formset importado (não recriando com inlineformset_factory)
-        if self.request.method == 'POST':
-            # Form POST: validar os dados enviados
-            context['items_formset'] = OrderItemFormSet(
-                self.request.POST,
-                instance=self.object or Order()
+    def post(self, request, *args, **kwargs):
+        form = self.form_class(request.POST, request.FILES)
+        if not form.is_valid():
+            return render(request, self.template_name, {
+                'import_form': form,
+                'order':       self.order,
+            })
+
+        # lê o arquivo
+        file = form.cleaned_data['file']
+        try:
+            df = (pd.read_csv(file) if file.name.lower().endswith('.csv')
+                  else pd.read_excel(file))
+        except Exception as e:
+            form.add_error(None, f'Erro ao ler o arquivo: {e}')
+            return render(request, self.template_name, {
+                'import_form': form,
+                'order':       self.order,
+            })
+
+        # verifica colunas
+        df.columns = [c.strip().lower() for c in df.columns]
+        expected = {'item', 'quantity'}
+        if not expected.issubset(df.columns):
+            form.add_error(None, f'Colunas inválidas, precisa ter: {expected}')
+            return render(request, self.template_name, {
+                'import_form': form,
+                'order':       self.order,
+            })
+
+        # valida e cria
+        errors = []
+        created = 0
+        for idx, row in df.iterrows():
+            num = idx + 1
+            name = str(row['item']).strip()
+            try:
+                inv_item = Item.objects.get(name__iexact=name)
+            except Item.DoesNotExist:
+                errors.append(f'Linha {num}: item "{name}" não existe.')
+                continue
+            try:
+                qty = float(row['quantity'])
+                if qty <= 0:
+                    raise ValueError
+            except Exception:
+                errors.append(f'Linha {num}: quantidade inválida.')
+                continue
+
+            # tudo ok, cria o OrderItem
+            OrderItem.objects.create(
+                order    = self.order,
+                item     = inv_item,
+                quantity = qty
             )
-        else:
-            # GET: carrega initial vindo da sessão, se existir
-            initial_items = self.request.session.pop(
-                NewOrderItemsImportView.session_items_key, None
-            )
-            if initial_items:
-                context['items_formset'] = OrderItemFormSet(
-                    instance=Order(),
-                    initial=initial_items
-                )
-            else:
-                context['items_formset'] = OrderItemFormSet(
-                    instance=Order()
-                )
+            created += 1
 
-        return context
+        if errors:
+            for e in errors:
+                form.add_error(None, e)
+            # exibimos também quantos já foram criados, se quiser
+            form.add_error(None, f'{created} itens importados antes dos erros.')
+            return render(request, self.template_name, {
+                'import_form': form,
+                'order':       self.order,
+            })
 
-    def form_valid(self, form):
-        # salva a order primeiro
-        self.object = form.save()
-
-        # 3) Valida e salva o formset usando o mesmo OrderItemFormSet
-        formset = OrderItemFormSet(
-            self.request.POST,
-            instance=self.object
-        )
-        if formset.is_valid():
-            formset.save()
-            return redirect(self.get_success_url())
-
-        # se o formset falhar, renderiza o form principal com erros
-        return self.form_invalid(form)
+        # sucesso: voltar para edição da ordem
+        return redirect('orders:order-edit', self.order.pk)
 
 
 class NewOrderItemsImportView(View):
@@ -193,7 +231,64 @@ class NewOrderItemsImportView(View):
 
         request.session[self.session_items_key] = initial_items
         return redirect('orders:order-add')
-        
+
+
+@method_decorator(never_cache, name='dispatch')
+class OrderCreateView(CreateView):
+    model = Order
+    form_class = OrderForm
+    template_name = 'orders/order_form.html'
+    success_url = reverse_lazy('orders:order-list')
+
+    # atalho para as chaves de sessão
+    sess_data_key = NewOrderItemsImportView.session_data_key
+    sess_items_key = NewOrderItemsImportView.session_items_key
+
+    # só pré-enche o form principal se vier da importação
+    def get_initial(self):
+        initial = super().get_initial()
+        if data := self.request.session.pop(self.sess_data_key, None):
+            initial.update(data)
+        return initial
+
+    # sempre monta o formset, puxando itens da sessão ou criando um vazio
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        initial_items = self.request.session.pop(self.sess_items_key, [])
+        # dynamic extra: ao menos 1 form, ou tantos quantos vieram importados
+        extra = max(1, len(initial_items))
+        FormSet = inlineformset_factory(
+            Order, OrderItem,
+            form=OrderItemForm,
+            extra=extra,
+            can_delete=True
+        )
+        context['items_formset'] = FormSet(
+            instance=self.object or Order(),
+            initial=initial_items
+        )
+        return context
+
+    # valida juntos form + formset antes de tudo
+    def post(self, request, *args, **kwargs):
+        self.object = None
+        form = self.get_form()
+        form_set = OrderItemFormSet(request.POST, instance=Order())
+
+        if form.is_valid() and form_set.is_valid():
+            self.object = form.save()
+            form_set.instance = self.object
+            form_set.save()
+            # limpa sessão de import
+            request.session.pop(self.sess_data_key,  None)
+            request.session.pop(self.sess_items_key, None)
+            return redirect(self.success_url)
+
+        return render(request, self.template_name, {
+            'form': form,
+            'items_formset': form_set,
+        })   
+
 
 class OrderUpdateView(UpdateView):
     model = Order
@@ -236,6 +331,7 @@ class OrderBatchListView(ListView):
         ctx['order'] = get_object_or_404(Order, pk=self.kwargs['order_pk'])
         return ctx
 
+
 class OrderBatchCreateView(CreateView):
     model = OrderBatch
     form_class    = OrderBatchForm
@@ -259,13 +355,16 @@ class OrderBatchCreateView(CreateView):
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
         data['order'] = self.order
-        if self.request.POST:
-            fs = BatchItemFormSet(self.request.POST, instance=self.object)
-        else:
-            fs = BatchItemFormSet(instance=self.object)
-        # aqui limitamos a queryset dos order_item
-        for f in fs.forms:
-            f.fields['order_item'].queryset = self.order.order_items.all()
+        # Cria um OrderBatch “temporário” para o formset
+        temp_batch = OrderBatch(order=self.order)
+        # Instancia o formset com POST se for o caso
+        fs = BatchItemFormSet(self.request.POST or None, instance=temp_batch)
+        # 1) Atualiza a base do formset para que o empty_form use o limited_qs
+        fs.form.base_fields['order_item'].queryset = self.order.order_items.all()
+        # 2) Atualiza cada subform já renderizado
+        for form in fs.forms:
+            form.fields['order_item'].queryset = self.order.order_items.all()
+
         data['batch_items_fs'] = fs
         return data
 

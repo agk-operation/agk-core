@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Itens (Ordem #{{ order.pk }}){% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="mb-3">Importar Itens para Ordem #{{ order.pk }}</h3>
+  <p>
+    Cliente: <strong>{{ order.customer }}</strong> |
+    Exportador: <strong>{{ order.exporter }}</strong> |
+    Companhia: <strong>{{ order.company }}</strong>
+  </p>
+
+  <form method="post" enctype="multipart/form-data" class="mb-3">
+    {% csrf_token %}
+    <div class="mb-3">
+      {{ import_form.file.label_tag }}
+      {{ import_form.file }}
+      {% for err in import_form.file.errors %}
+      <div class="invalid-feedback d-block">{{ err }}</div>
+      {% endfor %}
+    </div>
+    {% if import_form.non_field_errors %}
+    <div class="alert alert-danger">
+      {% for err in import_form.non_field_errors %}
+      <div>{{ err }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-upload"></i> Carregar e Criar Itens
+    </button>
+    <a href="{% url 'orders:order-edit' order.pk %}" class="btn btn-secondary ms-2">
+      <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+  </form>
+</div>
+{% endblock %}

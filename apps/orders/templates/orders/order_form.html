@@ -8,7 +8,7 @@
 {% block content %}
 <div class="container mt-4">
   <h3 class="display-6">
-    {% if object %}Editar{% else %}Nova{% endif %} Ordem
+    {% if object %}Editar Ordem #{{ object.pk }}{% else %}Nova Ordem{% endif %}
   </h3>
 
   <div class="card">
@@ -66,19 +66,40 @@
 
         {# ——— Bloco de Itens da Ordem ——— #}
         {{ items_formset.management_form }}
+
+        {# Exibe erros não-field do formset #}
+        {% if items_formset.non_form_errors %}
+          <div class="alert alert-danger">
+            {% for err in items_formset.non_form_errors %}
+              <div>{{ err }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
         <div class="card mt-4">
           <div class="card-header fw-bold">
             Itens da Ordem
-            <button
-              type="submit"
-              class="btn btn-outline-primary float-end"
-              formmethod="get"
-              formaction="{% url 'orders:order-item-import-new' %}"
-            >
-              <i class="bi bi-upload"></i> Importar Itens
-            </button>
+            {% if object %}
+              <button
+                type="submit"
+                class="btn btn-outline-primary float-end"
+                formmethod="get"
+                formaction="{% url 'orders:order-item-import' object.pk %}"
+              >
+                <i class="bi bi-upload"></i> Importar Itens
+              </button>
+            {% else %}
+              <button
+                type="submit"
+                class="btn btn-outline-primary float-end"
+                formmethod="get"
+                formaction="{% url 'orders:order-item-import-new' %}"
+              >
+                <i class="bi bi-upload"></i> Importar Itens
+              </button>
+            {% endif %}
           </div>
           <div class="card-body p-0">
+            {{ items_formset.management_form }}
             <table class="table  mb-0">
               <thead class="table-light">
                 <tr>
@@ -93,8 +114,22 @@
                   {% for hidden in subform.hidden_fields %}
                     {{ hidden }}
                   {% endfor %}
-                  <td>{{ subform.item }}</td>
-                  <td>{{ subform.quantity }}</td>
+                  <td>
+                    {{ subform.item }}
+                    {% if subform.item.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ subform.item.errors|join:" " }}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {{ subform.quantity }}
+                    {% if subform.quantity.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ subform.quantity.errors|join:" " }}
+                      </div>
+                    {% endif %}
+                  </td>
                   <td>
                     {% if subform.instance.pk %}
                       {{ subform.DELETE }} <small>Excluir</small>
@@ -116,7 +151,7 @@
           </div>
         </div>
         </div>
-        <div class="card-footer bg-white border-0">
+        <div class="mt-4 mb-4 ms-4">
           <button type="submit" class="btn btn-success">
             Salvar Ordem
           </button>

@@ -1,8 +1,8 @@
-
 document.addEventListener('DOMContentLoaded', () => {
   const grid       = document.getElementById('batch-items-grid');
   const addBtn     = document.getElementById('add-batch-item');
-  const tmpl       = document.getElementById('empty-form-template').innerHTML;
+  const templateEl = document.getElementById('empty-batch-item-template');
+  const tmplHtml   = templateEl.outerHTML; // pega o <tr> inteiro
   const totalForms = document.querySelector('input[name$="-TOTAL_FORMS"]');
 
   function updateIndices() {
@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     totalForms.value = rows.length;
   }
 
+  // remover linha delegadamente
   grid.addEventListener('click', e => {
     if (e.target.matches('.remove-row')) {
       e.target.closest('.item-row').remove();
@@ -23,10 +24,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // adicionar nova linha
   addBtn.addEventListener('click', () => {
-    const idx    = parseInt(totalForms.value, 10);
-    const html   = tmpl.replace(/__prefix__/g, idx);
-    grid.insertAdjacentHTML('beforeend', html);
+    const formIdx = parseInt(totalForms.value, 10);
+    let newRowHtml = tmplHtml
+      .replace(/__prefix__/g, formIdx)
+      .replace(/ id="empty-batch-item-template"/, '');
+    grid.insertAdjacentHTML('beforeend', newRowHtml);
     updateIndices();
   });
 });

@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from apps.core.models import Customer, Exporter, Company
 from apps.inventory.models import Item
 
@@ -16,6 +18,17 @@ class OrderItem(models.Model):
     item     = models.ForeignKey(Item,   on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
 
+    @property
+    def assigned_quantity(self):
+        # soma de todas as quantidades já lançadas em lotes (BatchItem)
+        return self.batch_items.aggregate(
+            total=Coalesce(Sum('quantity'), 0)
+        )['total']
+
+    @property
+    def remaining_quantity(self):
+        return self.quantity - self.assigned_quantity
+
     def __str__(self):
         return f"{self.item.name} ({self.quantity})"
 
@@ -27,9 +40,9 @@ class OrderBatch(models.Model):
         ('cancelled', 'Cancelado'),
     ]
 
-    order      = models.ForeignKey(Order,      related_name='batches', on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, related_name='batches', on_delete=models.CASCADE)
     batch_code = models.CharField(max_length=50)
-    status     = models.CharField(max_length=20, choices=STATUS_CHOICES, default='created')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='created')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

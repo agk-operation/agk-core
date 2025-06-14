@@ -1,5 +1,5 @@
 from django import forms
-from django.forms import inlineformset_factory
+from django.forms.models import BaseInlineFormSet, inlineformset_factory
 from .models import Order, OrderItem, OrderBatch, BatchItem
 
 
@@ -39,11 +39,53 @@ class BatchItemForm(forms.ModelForm):
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
         }
 
+
+class BaseBatchItemFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+
+        # 1) acumula totais por OrderItem e agrupa forms
+        totals = {}
+        forms_per_item = {}
+        global_errors = []
+        for form in self.forms:
+            # pula formulários marcados para deleção ou vazios
+            if self.can_delete and form.cleaned_data.get('DELETE'):
+                continue
+
+            oi = form.cleaned_data.get('order_item')
+            qty = form.cleaned_data.get('quantity')
+            if not oi or qty is None:
+                continue
+
+            totals.setdefault(oi, 0)
+            totals[oi] += qty
+
+            forms_per_item.setdefault(oi, []).append(form)
+
+        # 2) para cada OrderItem que estourou, marca erro em cada form associado
+        for oi, total in totals.items():
+            if total > oi.quantity:
+                msg = (
+                    f'O total ({total}) para o item "{oi.item.name}" '
+                    f'ultrapassa o disponível ({oi.quantity}).'
+                )
+                global_errors.append('Erro nos')
+                for form in forms_per_item[oi]:
+                    form.add_error('quantity', msg)
+        if global_errors:
+            raise forms.ValidationError(global_errors)
+
+
+# agora use esse BaseFormSet na construção do seu inlineformset:
 BatchItemFormSet = inlineformset_factory(
     OrderBatch, BatchItem,
     form=BatchItemForm,
-    extra=1, can_delete=True
+    formset=BaseBatchItemFormSet,
+    extra=1,
+    can_delete=True
 )
+
 
 class OrderBatchForm(forms.ModelForm):
     class Meta:
@@ -55,16 +97,6 @@ class OrderBatchForm(forms.ModelForm):
             'batch_code': forms.TextInput(attrs={'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
         }
-
-BatchItemFormSet = inlineformset_factory(
-    OrderBatch, BatchItem,
-    fields=('order_item','quantity'),
-    widgets={
-      'order_item': forms.Select(attrs={'class': 'form-select'}),
-      'quantity':   forms.NumberInput(attrs={'class':'form-control','min':1}),
-    },
-    extra=1, can_delete=True
-)
 
 
 class OrderItemsImportForm(forms.Form):

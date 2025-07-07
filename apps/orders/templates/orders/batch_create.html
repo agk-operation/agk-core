@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Novo Lote da Ordem #{{ order.pk }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="display-6">Novo Lote para Ordem #{{ order.pk }}</h3>
+  <div class="card">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        {# Erros não-campo do OrderBatchForm #}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        {{ form.as_p }}
+
+        <div class="card mt-4">
+          <div class="card-header fw-bold">Itens do Lote</div>
+          <div class="card-body p-0">
+            {{ items_fs.management_form }}
+
+            {# Erros não-campo do BatchItemFormSet #}
+            {% if items_fs.non_form_errors %}
+              <div class="alert alert-danger m-3">
+                {{ items_fs.non_form_errors }}
+              </div>
+            {% endif %}
+
+            {# Template oculto para JS, com select manual #}
+            <template id="empty-form-row">
+              <tr class="item-row align-middle">
+                {# Hidden fields (id, DELETE, etc) #}
+                {% for h in items_fs.empty_form.hidden_fields %}
+                  {{ h }}
+                {% endfor %}
+
+                <td>
+                  <select
+                    name="{{ items_fs.prefix }}-__prefix__-order_item"
+                    id="id_{{ items_fs.prefix }}-__prefix__-order_item"
+                    class="form-select"
+                  >
+                    <option value="" selected>---------</option>
+                    {% for oi in order.order_items.all %}
+                      <option value="{{ oi.pk }}">
+                        {{ oi.item.name }} ({{ oi.quantity }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                </td>
+
+                <td>
+                  <input
+                    type="number"
+                    name="{{ items_fs.prefix }}-__prefix__-quantity"
+                    id="id_{{ items_fs.prefix }}-__prefix__-quantity"
+                    class="form-control"
+                    min="1"
+                  >
+                </td>
+
+                <td>
+                  <button type="button" class="btn btn-sm btn-danger remove-row">
+                    Remover
+                  </button>
+                </td>
+              </tr>
+            </template>
+
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th>Quantidade</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="batch-items-grid">
+                {% for f in items_fs.forms %}
+                  <tr class="item-row align-middle">
+                    {% for h in f.hidden_fields %}
+                      {{ h }}
+                    {% endfor %}
+
+                    <td>
+                      {{ f.order_item }}
+                      {% for err in f.order_item.errors %}
+                        <div class="text-danger small">{{ err }}</div>
+                      {% endfor %}
+                    </td>
+
+                    <td>
+                      {{ f.quantity }}
+                      {% for err in f.quantity.errors %}
+                        <div class="text-danger small">{{ err }}</div>
+                      {% endfor %}
+                    </td>
+
+                    <td>
+                      {% if f.instance.pk %}
+                        {{ f.DELETE }} <small>Excluir</small>
+                      {% else %}
+                        <button type="button" class="btn btn-sm btn-danger remove-row">
+                          Remover
+                        </button>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card-footer bg-white border-0">
+            <button type="button" id="add-batch-item" class="btn btn-primary">
+              Adicionar Item
+            </button>
+          </div>
+        </div>
+
+        <div class="text-end mt-4">
+          <button type="submit" class="btn btn-success">Salvar Lote</button>
+          <a href="{% url 'orders:order-edit' order.pk %}" class="btn btn-secondary ms-2">
+            Voltar Pedido
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/batch_formsets.js' %}"></script>
+{% endblock %}
+

@@ -32,7 +32,7 @@
               </a>
             </li>
             <li>
-              <a href="#" class="nav-link px-0 align-middle">
+              <a href="{% url 'inventory:item-list' %}" class="nav-link px-0 align-middle">
                 <i class="bi bi-box-seam fs-4"></i>
                 <span class="ms-1">Produtos</span>
               </a>
@@ -47,6 +47,12 @@
               <a href="{% url 'orders:order-list' %}" class="nav-link px-0 align-middle">
                   <i class="bi bi-cart4 fs-4"></i>
                 <span class="ms-1">Ordens</span>
+              </a>
+            </li>
+            <li>
+              <a href="{% url 'orders:batch-list' %}" class="nav-link px-0 align-middle">
+                  <i class="bi bi-truck fs-4"></i>
+                <span class="ms-1">Lotes</span>
               </a>
             </li>
             <li>

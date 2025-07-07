@@ -1,11 +1,13 @@
 from django.contrib import admin
 from .models import Order, OrderItem, OrderBatch, BatchItem
+from apps.inventory.models import CustomerItemMargin 
 
 # —— Inline para OrderItem dentro de Order ——
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 1
     readonly_fields = ()   # você pode tornar campos somente-leitura se quiser
+
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):

@@ -1,36 +1,41 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const grid       = document.getElementById('batch-items-grid');
-  const addBtn     = document.getElementById('add-batch-item');
-  const templateEl = document.getElementById('empty-batch-item-template');
-  const tmplHtml   = templateEl.outerHTML; // pega o <tr> inteiro
-  const totalForms = document.querySelector('input[name$="-TOTAL_FORMS"]');
+  const addBtn          = document.getElementById('add-batch-item');
+  const tableBody       = document.getElementById('batch-items-grid');
+  const templateEl      = document.getElementById('empty-form-row');          // <template>
+  const totalFormsInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
 
-  function updateIndices() {
-    const rows = grid.querySelectorAll('.item-row');
-    rows.forEach((row, idx) => {
-      row.querySelectorAll('input, select').forEach(el => {
-        el.name = el.name.replace(/-\d+-/, `-${idx}-`);
-        if (el.id) el.id = el.id.replace(/-\d+-/, `-${idx}-`);
-      });
+  // checagem rápida
+  if (!addBtn || !tableBody || !templateEl || !totalFormsInput) {
+    console.error('Batch Formset: elemento não encontrado', {
+      addBtn, tableBody, templateEl, totalFormsInput
     });
-    totalForms.value = rows.length;
+    return;
   }
 
-  // remover linha delegadamente
-  grid.addEventListener('click', e => {
-    if (e.target.matches('.remove-row')) {
-      e.target.closest('.item-row').remove();
-      updateIndices();
-    }
+  // 1) adicionar nova linha
+  addBtn.addEventListener('click', () => {
+    console.log('Batch Formset: Add clicked, TOTAL_FORMS was', totalFormsInput.value);
+    const formCount = parseInt(totalFormsInput.value, 10);
+    // clona o conteúdo do <template>
+    const clone = templateEl.content.cloneNode(true);
+    const tr = clone.querySelector('tr');
+    // substitui o __prefix__ pelo índice correto
+    tr.innerHTML = tr.innerHTML.replace(/__prefix__/g, formCount);
+    tableBody.appendChild(tr);
+    totalFormsInput.value = formCount + 1;
   });
 
-  // adicionar nova linha
-  addBtn.addEventListener('click', () => {
-    const formIdx = parseInt(totalForms.value, 10);
-    let newRowHtml = tmplHtml
-      .replace(/__prefix__/g, formIdx)
-      .replace(/ id="empty-batch-item-template"/, '');
-    grid.insertAdjacentHTML('beforeend', newRowHtml);
-    updateIndices();
+  // 2) remover linha
+  tableBody.addEventListener('click', e => {
+    if (!e.target.classList.contains('remove-row')) return;
+    const row = e.target.closest('tr');
+    const delCheckbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+    if (delCheckbox) {
+      delCheckbox.checked = true;
+      row.style.display = 'none';
+    } else {
+      row.remove();
+      totalFormsInput.value = parseInt(totalFormsInput.value, 10) - 1;
+    }
   });
 });

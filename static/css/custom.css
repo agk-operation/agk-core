@@ -26,3 +26,36 @@
   border-top: 0 !important;
   border-bottom: 0 !important;
 }
+.btn-undo-stage {
+  background-color: #28a745;  /* verde “success” */
+  color: #fff;
+  border: none;
+  padding: 0.25rem 0.5rem;     /* ajuste de tamanho */
+}
+
+/* Garante que, ao passar o mouse ou focar, ele não escureça */
+.btn-undo-stage:hover,
+.btn-undo-stage:focus {
+  background-color: #28a745 !important;
+  box-shadow: none;
+}
+
+/* Remove qualquer transição de cor para que não veja fade */
+.btn-undo-stage,
+.btn-undo-stage:hover,
+.btn-undo-stage:focus {
+  transition: none !important;
+}
+
+.table-fixed {
+  table-layout: fixed !important;
+  width: 100%;
+}
+
+/* Coluna de nome de etapa: largura fixa + elipse */
+.stage-name-col {
+  width: 30%;               /* ajuste a % que fizer sentido */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

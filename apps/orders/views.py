@@ -1,19 +1,19 @@
 import pandas as pd
+from decimal import Decimal
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, View
 from django.forms import HiddenInput, inlineformset_factory
-from django.db.models import Sum, F
-from django.db.models.functions import Coalesce
+from django.db.models import Sum, F, DecimalField
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
-from apps.inventory.models import Item
-from apps.core.models import Customer, Company
-from .models import Order, OrderBatch, OrderItem
-from .forms import OrderItemForm, OrderItemFormSet, BatchItemFormSet, OrderForm, OrderBatchForm, OrderItemsImportForm
+from apps.inventory.models import Item, CustomerItemMargin
+from apps.core.models import Company
+from .models import Order, OrderBatch, OrderItem, BatchStage, BatchItem
+from .forms import OrderItemForm, OrderItemFormSet, BatchItemFormSet, OrderForm, BaseBatchItemFormSet, OrderBatchForm, OrderItemsImportForm, BatchStageForm, BatchItemForm
 
 # —— ORDERS ——
-class OrderListView(ListView):
+class OrderListView(ListView):  
     model = Order
     template_name = 'orders/order_list.html'
     context_object_name = 'orders'
@@ -36,7 +36,7 @@ class OrderListView(ListView):
         # lista todos os clientes para o filtro
         ctx['companies'] = Company.objects.order_by('name')
         ctx['selected_company']  = self.request.GET.get('company')
-        return ctx   
+        return ctx
 
 
 class OrderItemsImportView(View):
@@ -233,61 +233,79 @@ class NewOrderItemsImportView(View):
         return redirect('orders:order-add')
 
 
-@method_decorator(never_cache, name='dispatch')
 class OrderCreateView(CreateView):
-    model = Order
-    form_class = OrderForm
+    model         = Order
+    form_class    = OrderForm
     template_name = 'orders/order_form.html'
-    success_url = reverse_lazy('orders:order-list')
-
-    # atalho para as chaves de sessão
-    sess_data_key = NewOrderItemsImportView.session_data_key
+    success_url   = reverse_lazy('orders:order-list')
+    sess_data_key  = NewOrderItemsImportView.session_data_key
     sess_items_key = NewOrderItemsImportView.session_items_key
+    FORMSET_PREFIX = 'orderitems'
 
-    # só pré-enche o form principal se vier da importação
-    def get_initial(self):
-        initial = super().get_initial()
-        if data := self.request.session.pop(self.sess_data_key, None):
-            initial.update(data)
-        return initial
-
-    # sempre monta o formset, puxando itens da sessão ou criando um vazio
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        initial_items = self.request.session.pop(self.sess_items_key, [])
-        # dynamic extra: ao menos 1 form, ou tantos quantos vieram importados
+    def get_formset_class(self):
+        initial_items = self.request.session.get(self.sess_items_key, [])
         extra = max(1, len(initial_items))
-        FormSet = inlineformset_factory(
-            Order, OrderItem,
+        return inlineformset_factory(
+            Order,
+            OrderItem,
             form=OrderItemForm,
             extra=extra,
             can_delete=True
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = context.get('form')
+
+        if form and form.is_bound and form.is_valid():
+            customer = form.cleaned_data.get('customer')
+        else:
+            customer = form.initial.get('customer') if form else None
+
+        FormSet = self.get_formset_class()
         context['items_formset'] = FormSet(
+            self.request.POST or None,
             instance=self.object or Order(),
-            initial=initial_items
+            prefix=self.FORMSET_PREFIX,
+            form_kwargs={'customer': customer}
         )
         return context
 
-    # valida juntos form + formset antes de tudo
     def post(self, request, *args, **kwargs):
         self.object = None
         form = self.get_form()
-        form_set = OrderItemFormSet(request.POST, instance=Order())
+        FormSet = self.get_formset_class()
+        formset = FormSet(
+            request.POST,
+            instance=Order(),
+            prefix=self.FORMSET_PREFIX,
+            form_kwargs={'customer': form.cleaned_data.get('customer') if form.is_valid() else None}
+        )
 
-        if form.is_valid() and form_set.is_valid():
+        if form.is_valid() and formset.is_valid():
             self.object = form.save()
-            form_set.instance = self.object
-            form_set.save()
-            # limpa sessão de import
+            formset.instance = self.object
+            items = formset.save(commit=False)
+            for oi in items:
+                oi.cost_price = oi.item.cost_price
+                if oi.margin is None:
+                    try:
+                        cim = CustomerItemMargin.objects.get(
+                            customer=self.object.customer,
+                            item=oi.item
+                        )
+                        oi.margin = cim.margin
+                    except CustomerItemMargin.DoesNotExist:
+                        oi.margin = Decimal('0.00')
+                oi.save()
             request.session.pop(self.sess_data_key,  None)
             request.session.pop(self.sess_items_key, None)
             return redirect(self.success_url)
-
+        
         return render(request, self.template_name, {
             'form': form,
-            'items_formset': form_set,
-        })   
+            'items_formset': formset,
+        })
 
 
 class OrderUpdateView(UpdateView):
@@ -316,9 +334,38 @@ class OrderUpdateView(UpdateView):
             return self.form_invalid(form)
 
 # —— BATCHES ——
+class AllBatchListView(ListView):
+    """
+    Lista *todos* os lotes de todos os pedidos, mostrando:
+     - batch_code
+     - created_at
+     - order.customer
+     - total_value = soma(quantity * item.price) de cada BatchItem
+    """
+    model               = OrderBatch
+    template_name       = 'orders/batch_list.html'
+    context_object_name = 'batches'
+    paginate_by         = 20
+
+    def get_queryset(self):
+        # Anota cada batch com total financeiro
+        qs = (
+            OrderBatch.objects
+            .select_related('order__customer')
+            .annotate(
+                total_value=Sum(
+                    F('batch_items__quantity') *
+                    F('batch_items__order_item__item__selling_price'),
+                    output_field=DecimalField(max_digits=14, decimal_places=2)
+                )
+            )
+        )
+        return qs
+
+
 class OrderBatchListView(ListView):
     model = OrderBatch
-    template_name = 'orders/batch_list.html'
+    template_name = 'orders/order_batch_list.html'
     context_object_name = 'batches'
     paginate_by = 20
 
@@ -332,58 +379,159 @@ class OrderBatchListView(ListView):
         return ctx
 
 
-class OrderBatchCreateView(CreateView):
-    model = OrderBatch
-    form_class    = OrderBatchForm
-    template_name = 'orders/batch_form.html'
+class OrderBatchCreateView(View):
+    template_name = 'orders/batch_create.html'
+    ItemFS = inlineformset_factory(
+        OrderBatch, BatchItem,
+        form=BatchItemForm,
+        formset=BaseBatchItemFormSet,
+        extra=1, can_delete=True
+    )
 
     def dispatch(self, request, *args, **kwargs):
-        # captura a ordem pela PK da URL
         self.order = get_object_or_404(Order, pk=kwargs['order_pk'])
         return super().dispatch(request, *args, **kwargs)
 
-    def get_initial(self):
-        # já preenche o campo order no form do batch
-        return {'order': self.order}
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # esconde o campo order (já está definido)
+    def get(self, request, *args, **kwargs):
+        form = OrderBatchForm(initial={'order': self.order})
         form.fields['order'].widget = HiddenInput()
-        return form
 
-    def get_context_data(self, **kwargs):
-        data = super().get_context_data(**kwargs)
-        data['order'] = self.order
-        # Cria um OrderBatch “temporário” para o formset
-        temp_batch = OrderBatch(order=self.order)
-        # Instancia o formset com POST se for o caso
-        fs = BatchItemFormSet(self.request.POST or None, instance=temp_batch)
-        # 1) Atualiza a base do formset para que o empty_form use o limited_qs
-        fs.form.base_fields['order_item'].queryset = self.order.order_items.all()
-        # 2) Atualiza cada subform já renderizado
-        for form in fs.forms:
-            form.fields['order_item'].queryset = self.order.order_items.all()
+        # instância nova, mas já “ligada” à ordem
+        items_fs = self.ItemFS(instance=OrderBatch(order=self.order))
 
-        data['batch_items_fs'] = fs
-        data['balances'] = self.order.get_item_balances()
-        return data
+        allowed = self.order.order_items.all()
+        for f in items_fs.forms:
+            f.fields['order_item'].queryset = allowed
+        items_fs.empty_form.fields['order_item'].queryset = allowed
 
-    def form_valid(self, form):
-        context = self.get_context_data()
-        fs = context['batch_items_fs']
-        if fs.is_valid():
-            # salva o batch com a ordem associada
+        return render(request, self.template_name, {
+            'form': form,
+            'items_fs': items_fs,
+            'order': self.order,
+        })
+
+    def post(self, request, *args, **kwargs):
+        form = OrderBatchForm(request.POST)
+        form.fields['order'].widget = HiddenInput()
+
+        items_fs = self.ItemFS(
+            request.POST,
+            instance=OrderBatch(order=self.order)
+        )
+
+        allowed = self.order.order_items.all()
+        for f in items_fs.forms:
+            f.fields['order_item'].queryset = allowed
+        items_fs.empty_form.fields['order_item'].queryset = allowed
+
+        if form.is_valid() and items_fs.is_valid():
             batch = form.save(commit=False)
             batch.order = self.order
             batch.save()
-            # salva itens do batch
-            fs.instance = batch
-            fs.save()
-            return redirect(self.get_success_url())
-        else:
-            return self.render_to_response(self.get_context_data(form=form))
+            items_fs.instance = batch
+            items_fs.save()
+            for stage_name in DEFAULT_BATCH_STAGES:
+                BatchStage.objects.create(batch=batch, name=stage_name)
+            return redirect('orders:batch-detail',
+                            order_pk=self.order.pk, pk=batch.pk)
 
-    def get_success_url(self):
-        # volta à lista de lotes da ordem
-        return reverse_lazy('orders:order-edit', args=[self.order.pk])
+        return render(request, self.template_name, {
+            'form': form,
+            'items_fs': items_fs,
+            'order': self.order,
+        })
+
+
+DEFAULT_BATCH_STAGES = [
+    'Order',
+    'PO',
+    'PI',
+    'Deposit Payment',
+    'Packing Confirm.',
+    'Condition Confirm.',
+    'Place the Order',
+    'ETD',
+    'Balance Payment',
+    'Pre-Loading'
+]
+
+class OrderBatchDetailView(View):
+    template_name = 'orders/batch_detail.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.batch = get_object_or_404(
+            OrderBatch,
+            pk=kwargs['pk'],
+            order_id=kwargs['order_pk']
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name, self._build_context())
+
+    def post(self, request, *args, **kwargs):
+        ctx = self._build_context()
+        form = ctx['form']
+
+        # atualiza dados principais
+        form = OrderBatchForm(request.POST, instance=self.batch)
+        if not form.is_valid():
+            ctx['form'] = form
+            return render(request, self.template_name, ctx)
+
+        # processa cada etapa fixa
+        for idx, name in enumerate(DEFAULT_BATCH_STAGES):
+            prefix = f'stages-{idx}'
+            active = request.POST.get(f'{prefix}-active') == 'on'
+            stage_id = request.POST.get(f'{prefix}-id')
+            est = request.POST.get(f'{prefix}-estimated') or None
+            act = request.POST.get(f'{prefix}-actual') or None
+
+            if active and stage_id:
+                # update existente
+                st = BatchStage.objects.get(pk=stage_id, batch=self.batch)
+                st.estimated_completion = est
+                st.actual_completion = act
+                st.save()
+            elif active and not stage_id:
+                # criar nova
+                BatchStage.objects.create(
+                    batch=self.batch,
+                    name=name,
+                    estimated_completion=est,
+                    actual_completion=act
+                )
+            elif not active and stage_id:
+                # remove
+                BatchStage.objects.filter(pk=stage_id, batch=self.batch).delete()
+
+        form.save()
+        return redirect('orders:order-edit', self.batch.order.pk)
+
+    def _build_context(self):
+        # dados principais
+        form = OrderBatchForm(instance=self.batch)
+        items_fs = BatchItemFormSet(instance=self.batch)
+
+        # prepara o dicionário das etapas já salvas
+        existing = {s.name: s for s in self.batch.stages.all()}
+
+        # constrói um list de dicts para template
+        stage_rows = []
+        for idx, name in enumerate(DEFAULT_BATCH_STAGES):
+            st = existing.get(name)
+            stage_rows.append({
+                'idx': idx,
+                'name': name,
+                'id': getattr(st, 'pk', ''),
+                'estimated': getattr(st, 'estimated_completion', ''),
+                'actual':    getattr(st, 'actual_completion', ''),
+                'active':   bool(st),
+            })
+
+        return {
+            'batch':    self.batch,
+            'form':     form,
+            'items_fs': items_fs,
+            'stage_rows': stage_rows,
+        }

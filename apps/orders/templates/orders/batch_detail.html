@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Lote {{ batch.batch_code }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="display-6">Lote {{ batch.batch_code }}</h3>
+  <div class="card">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- Dados do Lote -->
+        <div class="card mb-4">
+          <div class="card-header fw-bold">Dados do Lote</div>
+          <div class="card-body">
+            {{ form.as_p }}
+          </div>
+        </div>
+
+        <!-- Etapas do Lote -->
+        <div class="card mb-4">
+          <div class="card-header fw-bold">Etapas do Lote</div>
+            <div class="card-body p-0">
+              <table class="table mb-0 table-fixed">
+                <colgroup>
+                  <!-- 1ª coluna = Nome da etapa -->
+                  <col style="width: 200px;">
+                  <!-- 2ª coluna = Estimado -->
+                  <col style="width: 120px;">
+                  <!-- 3ª coluna = Efetivo -->
+                  <col style="width: 120px;">
+                   <!-- 4ª coluna = Ações -->
+                  <col style="width: 60px;">
+                </colgroup>
+                <thead class="table-light">
+                  <tr>
+                    <th class="stage-name-col">Etapa</th>
+                    <th>Estimado</th>
+                    <th>Efetivo</th>
+                    <th style="width:4rem">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="stages-grid">
+                  {% for row in stage_rows %}
+                  <tr class="stage-row align-middle" data-idx="{{ row.idx }}">
+                    <td>{{ row.name }}</td>
+                    <td>
+                      <input
+                        type="date"
+                        name="stages-{{ row.idx }}-estimated"
+                        class="form-control form-control-sm"
+                        value="{{ row.estimated }}"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        name="stages-{{ row.idx }}-actual"
+                        class="form-control form-control-sm"
+                        value="{{ row.actual }}"
+                      />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger remove-row-stage"
+                        title="Desmarcar etapa"
+                      ><i class="bi bi-trash"></i></button>
+                      <input 
+                        type="hidden"
+                        name="stages-{{ row.idx }}-active"
+                        value="{% if row.active %}on{% endif %}"
+                      />
+                      <input
+                        type="hidden"
+                        name="stages-{{ row.idx }}-id"
+                        value="{{ row.id }}"
+                      />
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+        </div>
+
+        <!-- Bucket de etapas desativadas -->
+         <div class="card mb-4">
+          <div class="card-header fw-bold">Etapas Desativadas</div>
+            <div class="card-body">
+              <div id="removed-stages" class="d-flex flex-wrap gap-2">
+                {# badges serão renderizadas aqui pelo JS #}
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Itens do Lote -->
+        <div class="card mb-4">
+          <div class="card-header fw-bold">Itens do Lote</div>
+          <div class="card-body p-0">
+            {{ items_fs.management_form }}
+            {% if items_fs.non_form_errors %}
+            <div class="alert alert-danger mb-3">
+              {% for err in items_fs.non_form_errors %}{{ err }}<br>{% endfor %}
+            </div>
+            {% endif %}
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th>Qtd. Original</th>
+                  <th>Qtd. no Lote</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="batch-items-grid">
+                {% for f in items_fs.forms %}
+                <tr class="item-row align-middle">
+                  {% for h in f.hidden_fields %}{{ h }}{% endfor %}
+                  <td>{{ f.order_item }}</td>
+                  <td>{% if f.instance.pk %}{{ f.instance.order_item.quantity }}{% else %}&mdash;{% endif %}</td>
+                  <td>
+                    {{ f.quantity }}
+                    {% if f.quantity.errors %}
+                    <div class="invalid-feedback d-block">{{ f.quantity.errors|join:" " }}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if f.instance.pk %}
+                    {{ f.DELETE }} <small>Excluir</small>
+                    {% else %}
+                    <button type="button" class="btn btn-sm btn-danger remove-row">Remover</button>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card-footer bg-white border-0">
+            <button type="button" id="add-batch-item" class="btn btn-primary">Adicionar Item</button>
+          </div>
+        </div>
+
+        <div class="text-end mb-5">
+          <button type="submit" class="btn btn-success">Salvar Todas Alterações</button>
+          <a href="{% url 'orders:order-edit' batch.order.pk %}" class="btn btn-secondary ms-2">Voltar Pedido</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Templates ocultos -->
+<table class="d-none">
+  <tbody>
+    <tr id="empty-batch-item-template" class="item-row align-middle">
+      {% for h in items_fs.empty_form.hidden_fields %}{{ h }}{% endfor %}
+      <td>{{ items_fs.empty_form.order_item }}</td>
+      <td>{{ items_fs.empty_form.quantity }}</td>
+      <td><button type="button" class="btn btn-sm btn-danger remove-row">Remover</button></td>
+    </tr>
+  </tbody>
+</table>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/batch_formsets.js' %}"></script>
+<script src="{% static 'js/batch_stage_formset.js' %}"></script>
+{% endblock %}
+

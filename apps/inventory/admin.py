@@ -1,16 +1,100 @@
 from django.contrib import admin
-from .models import Item
+from . import models
 
-@admin.register(Item)
+
+class ItemModelApplicationInline(admin.TabularInline):
+    model = models.ItemModelApplication
+    extra = 1
+
+
+@admin.register(models.Item)
 class ItemAdmin(admin.ModelAdmin):
-    list_display  = ('sku', 'name', 'category', 'total_stock')
+    list_display = [field.name for field in models.Item._meta.fields]
     list_filter   = ('category',)
-    search_fields = ('sku', 'name')
-    ordering      = ('sku',)
+    search_fields = ('p_code', 'name')
+    ordering      = ('p_code',)
     readonly_fields = ()  # adicione aqui campos apenas-leitura, se quiser
 
     fieldsets = (
-        (None, {
-            'fields': ('sku', 'name', 'category', 'total_stock')
-        }),
+                ('Basic Data', {
+                    'fields': ('name', 'category', 'subcategory', 'project', 'supplier', 'supplier_chain', 'chain')
+                }),
+                ('Item Specifications' , {
+                    'fields' : ('brand_manufacturer', 'ncm')
+                }),
+                ('Codes', {
+                    'fields': ('p_code', 's_code')
+                }),
+                ('Currency Data', {
+                    'fields': ('cost_price', 'selling_price', 'currency'),
+                })
     )
+
+    def get_model_applications(self, obj):
+        return ", ".join(str(m) for m in obj.model_application.all())
+    get_model_applications.short_description = "Model Applications"
+
+
+@admin.register(models.CustomerItemMargin)
+class CustomerItemMarginAdmin(admin.ModelAdmin):
+    list_display = ('customer','item','margin')
+    list_filter  = ('customer',)
+    search_fields= ('item__name',)
+
+
+@admin.register(models.Project)
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name', 'description')
+    list_filter = ()
+
+
+@admin.register(models.Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name', 'description')
+    list_filter = ()
+
+
+@admin.register(models.Subcategory)
+class SubcategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name', 'description')
+    list_filter = ()
+
+
+@admin.register(models.SupplierChain)
+class SupplierChainAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name', 'description')
+    list_filter = ()
+
+
+@admin.register(models.Ncm)
+class NcmAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name', 'description')
+    list_filter = ()
+
+
+@admin.register(models.Chain)
+class ChainAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name', 'description')
+    list_filter = ()
+
+
+@admin.register(models.BrandManufacturer)
+class BrandManufacturerAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name', 'description')
+    list_filter = ()
+
+
+@admin.register(models.ModelApplication)
+class ModelApplicationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name', 'description')
+    list_filter = ()
+
+    

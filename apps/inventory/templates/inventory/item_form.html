@@ -1,0 +1,322 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load filters %}
+
+{% block title %}{{ object.pk|yesno:"Editar,Cadastrar Novo" }} Item{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="display-6">{{ object.pk|yesno:"Editar,Cadastrar Novo" }} Item</h3>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <!-- CARD: Dados Básicos -->
+    <div class="card mb-4">
+      <div class="card-header fw-bold">Dados Básicos</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name in 'name category supplier subcategory project supplier_chain chain' %}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <div class="d-flex align-items-center gap-2">
+                  {{ field }}
+                  {% if field.field.queryset %}
+                    {% if create_urls|get_item:field.name %}
+                      <a href="{% url create_urls|get_item:field.name %}" target="_blank" title="Adicionar">
+                        <i class="fas fa-plus-circle"></i>
+                      </a>
+                    {% endif %}
+                    <a id="edit-{{ field.name }}-link" href="#" target="_blank" title="Editar">
+                      <i class="fas fa-edit"></i>
+                    </a>
+                  {% endif %}
+                </div>
+                {% if field.errors %}
+                  <div class="text-danger">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD: Especificações -->
+    <div class="card mb-4">
+      <div class="card-header fw-bold">Especificações</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name in 'brand_manufacturer ncm' %}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <div class="d-flex align-items-center gap-2">
+                  {{ field }}
+                  {% if field.field.queryset %}
+                    {% if create_urls|get_item:field.name %}
+                      <a href="{% url create_urls|get_item:field.name %}" target="_blank" title="Adicionar">
+                        <i class="fas fa-plus-circle"></i>
+                      </a>
+                    {% endif %}
+                    <a id="edit-{{ field.name }}-link" href="#" target="_blank" title="Editar">
+                      <i class="fas fa-edit"></i>
+                    </a>
+                  {% endif %}
+                </div>
+                {% if field.errors %}
+                  <div class="text-danger mt-1">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD: Modelos Aplicáveis -->
+    <!-- CARD: Modelos Aplicáveis -->
+    {% if formset %}
+      <div class="card mb-4">
+        <div class="card-header fw-bold">Modelos Aplicáveis</div>
+        <div class="card-body">
+
+          {# Erros gerais do formset (não vinculados a campos específicos) #}
+          {% if formset.non_form_errors %}
+            <div class="alert alert-danger">
+              <ul class="mb-0">
+                {% for err in formset.non_form_errors %}
+                  <li>{{ err }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+
+          {# Campos de controle do formset #}
+          {{ formset.management_form }}
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Modelo</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="model-application-grid">
+              {% for subform in formset.forms %}
+                {# 1) Renderiza todos os hidden_fields (id, ORDER, DELETE, etc.) #}
+                {% for hidden in subform.hidden_fields %}
+                  {{ hidden }}
+                {% endfor %}
+
+                <tr class="formset-row">
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      {{ subform.model_application }}
+                      {% if create_urls|get_item:'model_application' %}
+                        <a href="{% url create_urls|get_item:'model_application' %}" target="_blank" title="Adicionar">
+                          <i class="fas fa-plus-circle"></i>
+                        </a>
+                      {% endif %}
+                      <a class="edit-model-application-link" href="#" target="_blank" title="Editar" style="display: none;">
+                        <i class="fas fa-edit"></i>
+                      </a>
+                    </div>
+
+                    {# Erros específicos do campo model_application #}
+                    {% if subform.model_application.errors %}
+                      <ul class="text-danger small mb-0">
+                        {% for err in subform.model_application.errors %}
+                          <li>{{ err }}</li>
+                        {% endfor %}
+                      </ul>
+                    {% endif %}
+
+                    {# Erros não-vinculados deste subform #}
+                    {% if subform.non_field_errors %}
+                      <ul class="text-danger small mt-1 mb-0">
+                        {% for err in subform.non_field_errors %}
+                          <li>{{ err }}</li>
+                        {% endfor %}
+                      </ul>
+                    {% endif %}
+                  </td>
+
+                  <td>
+                    {% if subform.instance.pk %}
+                      {{ subform.DELETE }} <label>Excluir</label>
+                    {% else %}
+                      <button type="button" class="btn btn-danger btn-sm remove-model-row">
+                        Remover
+                      </button>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>  
+          <template id="empty-form-template">
+            <tr class="formset-row align-middle">
+              {% for hidden in formset.empty_form.hidden_fields %}
+                {{ hidden }}
+              {% endfor %}
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  {{ formset.empty_form.model_application }}
+                  {% if create_urls|get_item:'model_application' %}
+                    <a href="{% url create_urls|get_item:'model_application' %}" target="_blank" title="Adicionar">
+                      <i class="fas fa-plus-circle"></i>
+                    </a>
+                  {% endif %}
+                  <a class="edit-model-application-link" href="#" target="_blank" title="Editar" style="display: none;">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                </div>
+              </td>
+              <td>
+                <button type="button" class="btn btn-danger btn-sm remove-model-row">Remover</button>
+              </td>
+            </tr>
+          </template>
+
+          <button type="button" class="btn btn-primary" id="add-model-application">
+            Adicionar Modelo
+          </button>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- CARD: Packing Data -->
+    <div class="card mb-4">
+      <div class="card-header fw-bold">Packing Data</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name in 'net_weight package_gross_weight packing_lengh packing_width packing_height individual_packing_size individual_packing_type' %}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                  <div class="text-danger">{{ field.errors }}</div>
+                {% endif %}
+              </div>  
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>  
+
+    <!-- CARD: Comercial Infos -->
+    <div class="card mb-4">
+      <div class="card-header fw-bold">Comercial Infos</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name == 'moq' %}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                  <div class="text-danger">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>  
+
+    <!-- CARD: Códigos -->
+    <div class="card mb-4">
+      <div class="card-header fw-bold">Códigos</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name in 'p_code s_code' %}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                  <div class="text-danger">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD: Dados Monetários -->
+    <div class="card mb-4">
+      <div class="card-header fw-bold">Dados Monetários</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name in 'cost_price selling_price currency' %}
+              <div class="col-md-4">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <div class="d-flex align-items-center gap-2">
+                  {{ field }}
+                  {% if field.field.queryset %}
+                    {% if create_urls|get_item:field.name %}
+                      <a href="{% url create_urls|get_item:field.name %}" target="_blank" title="Adicionar">
+                        <i class="fas fa-plus-circle"></i>
+                      </a>
+                    {% endif %}
+                    <a id="edit-{{ field.name }}-link" href="#" target="_blank" title="Editar">
+                      <i class="fas fa-edit"></i>
+                    </a>
+                  {% endif %}
+                </div>
+                {% if field.errors %}
+                  <div class="text-danger">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="text-end mt-4">
+      <button type="submit" class="btn btn-success">Salvar Item</button>
+      <a href="{% url 'inventory:item-list' %}" class="btn btn-secondary ms-2">Voltar</a>
+    </div>
+  </form>
+</div>
+
+
+{% endblock %}
+
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+<script type="module">
+  import { setupEditLinks, setupFormsetEditLinks } from "{% static 'js/field_links.js' %}";
+  import { setupInlineFormset } from "{% static 'js/formset_manager.js' %}";
+
+  setupEditLinks([
+    'category', 'subcategory', 'project',
+    'supplier', 'supplier_chain', 'chain',
+    'ncm', 'brand_manufacturer', 'currency'
+  ], '/inventory', {
+    brand_manufacturer: 'brandmanufacturer',
+    supplier_chain: 'supplierchain'
+  });
+
+  setupFormsetEditLinks('model_application', '/inventory', {
+    model_application: 'modelapplication'
+  });
+
+
+  setupInlineFormset({
+    gridId: 'model-application-grid',
+    addButtonId: 'add-model-application',
+    emptyFormId: 'empty-form-template',
+    totalFormsId: 'id_itemmodelapplication_set-TOTAL_FORMS',
+    rowClass: 'formset-row',
+    removeButtonClass: 'remove-model-row'
+  });
+</script>
+{% endblock %}

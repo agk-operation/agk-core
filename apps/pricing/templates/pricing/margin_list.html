@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Margens por Cliente/Item{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">Margens por Cliente/Item</h2>
+  <a href="{% url 'pricing:margin-add' %}" class="btn btn-primary mb-3">
+    + Adicionar Margem
+  </a>
+  {% if object_list %}
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Item</th>
+          <th>Margem (%)</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for margin in object_list %}
+          <tr>
+            <td>{{ margin.customer.name }}</td>
+            <td>{{ margin.item.name }}</td>
+            <td>{{ margin.margin }}</td>
+            <td>
+              <a href="{% url 'pricing:margin-edit' margin.pk %}" class="btn btn-sm btn-outline-secondary">
+                Editar
+              </a>
+              <a href="{% url 'pricing:margin-delete' margin.pk %}" class="btn btn-sm btn-outline-danger">
+                Excluir
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if is_paginated %}
+      <nav>
+        <ul class="pagination">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+            </li>
+          {% endif %}
+          <li class="page-item disabled">
+            <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+          </li>
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% endif %}
+  {% else %}
+    <div class="alert alert-info">Nenhuma margem cadastrada.</div>
+  {% endif %}
+</div>
+{% endblock %}

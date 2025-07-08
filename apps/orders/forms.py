@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet, inlineformset_factory
 from django.db.models import Sum
 from .models import Order, OrderItem, OrderBatch, BatchItem, BatchStage
-from apps.inventory.models import CustomerItemMargin
+from apps.pricing.models import CustomerItemMargin
 
 
 class OrderForm(forms.ModelForm):
@@ -33,7 +33,7 @@ class OrderItemForm(forms.ModelForm):
         fields = ('item', 'quantity', 'margin')
         widgets = {
             'item': forms.Select(attrs={'class': 'form-select'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),   
         }
 
     def __init__(self, *args, customer=None, **kwargs):

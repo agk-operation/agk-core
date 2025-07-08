@@ -1,6 +1,5 @@
 from django.contrib import admin
-from .models import Order, OrderItem, OrderBatch, BatchItem
-from apps.inventory.models import CustomerItemMargin 
+from .models import Order, OrderItem, OrderBatch, BatchItem 
 
 # —— Inline para OrderItem dentro de Order ——
 class OrderItemInline(admin.TabularInline):

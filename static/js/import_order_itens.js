@@ -1,14 +1,18 @@
-document.getElementById('import-form')
-  .addEventListener('submit', function(e) {
-    // 1) Pega o form principal pelos seus nomes de campo
-    const orderForm = document.getElementById('order-form');
-    const customer  = orderForm.querySelector('select[name="customer"], input[name="customer"]');
-    const exporter  = orderForm.querySelector('select[name="exporter"], input[name="exporter"]');
-    const company   = orderForm.querySelector('select[name="company"], input[name="company"]');
+document.addEventListener('DOMContentLoaded', () => {
+  const importForm = document.getElementById('import-form');
+  if (!importForm) return;
 
-    // 2) Copia o valor para os hidden inputs
-    document.getElementById('import-customer').value   = customer?.value || '';
-    document.getElementById('import-exporter').value   = exporter?.value || '';
-    document.getElementById('import-company').value   = company?.value || '';
-    // (o form GET vai agora incluir esses parâmetros na URL)
+  importForm.addEventListener('submit', function(e) {
+    // 1) Pega o form principal pelos seus nomes de campo
+    const form = document.getElementById('order-form');
+    const customer = form.querySelector('[name="customer"]')?.value || '';
+    const exporter = form.querySelector('[name="exporter"]')?.value || '';
+    const company  = form.querySelector('[name="company"]')?.value  || '';
+
+    // 2) Copia o valor para os hidden inputs do form de import
+    document.getElementById('import-customer').value = customer?.value || '';
+    document.getElementById('import-exporter').value = exporter?.value || '';
+    document.getElementById('import-company').value  = company?.value  || '';
+    // agora o GET vai incluir esses hidden fields na URL
+  });
 });

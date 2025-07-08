@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmar Exclusão{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">Excluir Margem</h2>
+  <div class="alert alert-warning">
+    Tem certeza de que deseja excluir a margem
+    <strong>{{ object.customer.name }} → {{ object.item.name }}:</strong>
+    {{ object.margin }}%?
+  </div>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Sim, excluir</button>
+    <a href="{% url 'pricing:margin-list' %}" class="btn btn-secondary ms-2">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

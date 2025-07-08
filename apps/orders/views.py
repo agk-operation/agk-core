@@ -2,12 +2,14 @@ import pandas as pd
 from decimal import Decimal
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.contrib import messages
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.views.generic import ListView, CreateView, UpdateView, View
 from django.forms import HiddenInput, inlineformset_factory
 from django.db.models import Sum, F, DecimalField
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import never_cache
-from apps.inventory.models import Item, CustomerItemMargin
+from apps.inventory.models import Item
+from apps.pricing.models import CustomerItemMargin
 from apps.core.models import Company
 from .models import Order, OrderBatch, OrderItem, BatchStage, BatchItem
 from .forms import OrderItemForm, OrderItemFormSet, BatchItemFormSet, OrderForm, BaseBatchItemFormSet, OrderBatchForm, OrderItemsImportForm, BatchStageForm, BatchItemForm
@@ -135,44 +137,59 @@ class NewOrderItemsImportView(View):
     session_items_key  = 'new_order_items'
 
     def get(self, request):
-        # captura e armazena customer & due_date
-        order_data = {}
-        for field in ('customer', 'exporter', 'company'):
-            if val := request.GET.get(field):
-                order_data[field] = val
-        request.session[self.session_data_key] = order_data
-
-        # exibe form de import com dados principais como texto
+        # só exibe o template de upload, já pode mostrar order_data em texto
         import_form = OrderItemsImportForm()
+        order_data  = request.session.get(self.session_data_key, {})
         return render(request, self.template_name, {
             'import_form': import_form,
+            'order_data':  order_data,
         })
 
     def post(self, request):
-        import_form = OrderItemsImportForm(request.POST, request.FILES)
+        # Se não veio arquivo, estamos na 1ª etapa: cachear os hidden inputs
+        if 'file' not in request.FILES:
+            return self._cache_order_data(request)
 
+        # se veio arquivo, processa a importação
+        return self._handle_file_upload(request)
+
+    def _cache_order_data(self, request):
+        data = {}
+        for field in ('customer','exporter','company'):
+            if val := request.POST.get(field):
+                data[field] = val
+        request.session[self.session_data_key] = data
+
+        # reexibe o mesmo template, agora com order_data em sessão
+        import_form = OrderItemsImportForm()
+        return render(request, self.template_name, {
+            'import_form': import_form,
+            'order_data':  data,
+        })
+
+    def _handle_file_upload(self, request):
+        import_form = OrderItemsImportForm(request.POST, request.FILES)
         if not import_form.is_valid():
             return render(request, self.template_name, {
                 'import_form': import_form,
+                'order_data':  request.session.get(self.session_data_key, {}),
             })
 
-        # 1) Lê arquivo
         file = import_form.cleaned_data['file']
         try:
-            df = (
-                pd.read_csv(file)
-                if file.name.lower().endswith('.csv')
-                else pd.read_excel(file)
-            )
+            df = (pd.read_csv(file)
+                  if file.name.lower().endswith('.csv')
+                  else pd.read_excel(file))
         except Exception as e:
             import_form.add_error(None, f'Erro ao ler o arquivo: {e}')
             return render(request, self.template_name, {
                 'import_form': import_form,
+                'order_data':  request.session.get(self.session_data_key, {}),
             })
 
-        # 2) Checa cabeçalho
+        # valida cabeçalho
         df.columns = [c.strip().lower() for c in df.columns]
-        expected = {'item', 'quantity'}
+        expected = {'item','quantity'}
         if not expected.issubset(df.columns):
             import_form.add_error(
                 None,
@@ -180,30 +197,27 @@ class NewOrderItemsImportView(View):
             )
             return render(request, self.template_name, {
                 'import_form': import_form,
+                'order_data':  request.session.get(self.session_data_key, {}),
             })
 
-        # 3) Valida conteúdo linha a linha
+        # valida conteúdo linha a linha
         errors = []
         seen = set()
         for idx, row in df.iterrows():
             linha = idx + 1
-            item_name = str(row['item']).strip()
-
-            # existe o produto?
+            name  = str(row['item']).strip()
             try:
-                item = Item.objects.get(name__iexact=item_name)
+                item = Item.objects.get(name__iexact=name)
             except Item.DoesNotExist:
-                errors.append(f'Linha {linha}: produto "{item_name}" não encontrado.')
+                errors.append(f'Linha {linha}: produto "{name}" não encontrado.')
                 continue
 
-            # não duplicar
-            key = item_name.lower()
+            key = name.lower()
             if key in seen:
-                errors.append(f'Linha {linha}: produto "{item_name}" duplicado.')
+                errors.append(f'Linha {linha}: produto "{name}" duplicado.')
             else:
                 seen.add(key)
 
-            # quantidade > 0
             try:
                 qty = float(row['quantity'])
                 if qty <= 0:
@@ -211,82 +225,90 @@ class NewOrderItemsImportView(View):
             except Exception:
                 errors.append(f'Linha {linha}: quantidade inválida.')
 
-
-        # se encontrou erros "fatais", reexibe form com mensagens
         if errors:
             for err in errors:
                 import_form.add_error(None, err)
             return render(request, self.template_name, {
                 'import_form': import_form,
+                'order_data':  request.session.get(self.session_data_key, {}),
             })
 
-        # 4) Monta initial_items e armazena na sessão
-        initial_items = []
-        for idx, row in df.iterrows():
-            item = Item.objects.get(name__iexact=str(row['item']).strip())
-            initial_items.append({
-                'item':    item.pk,
-                'quantity':   float(row['quantity']),
-            })
-
+        # monta initial_items e grava na sessão
+        initial_items = [
+            {'item': Item.objects.get(name__iexact=str(row['item']).strip()).pk,
+             'quantity': float(row['quantity'])}
+            for _, row in df.iterrows()
+        ]
         request.session[self.session_items_key] = initial_items
+
         return redirect('orders:order-add')
 
 
+@method_decorator(never_cache, name='dispatch')
 class OrderCreateView(CreateView):
-    model         = Order
-    form_class    = OrderForm
-    template_name = 'orders/order_form.html'
-    success_url   = reverse_lazy('orders:order-list')
-    sess_data_key  = NewOrderItemsImportView.session_data_key
-    sess_items_key = NewOrderItemsImportView.session_items_key
-    FORMSET_PREFIX = 'orderitems'
+    model           = Order
+    form_class      = OrderForm
+    template_name   = 'orders/order_form.html'
+    success_url     = reverse_lazy('orders:order-list')
+    sess_data_key   = NewOrderItemsImportView.session_data_key
+    sess_items_key  = NewOrderItemsImportView.session_items_key
+    FORMSET_PREFIX  = 'orderitems'
+
+    def get_initial(self):
+        initial    = super().get_initial()
+        order_data = self.request.session.pop(self.sess_data_key, None)
+        if order_data:
+            initial.update(order_data)
+        return initial
 
     def get_formset_class(self):
         initial_items = self.request.session.get(self.sess_items_key, [])
-        extra = max(1, len(initial_items))
         return inlineformset_factory(
             Order,
             OrderItem,
             form=OrderItemForm,
-            extra=extra,
+            extra=max(1, len(initial_items)),
             can_delete=True
         )
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        form = context.get('form')
+        ctx  = super().get_context_data(**kwargs)
+        form = ctx['form']
 
-        if form and form.is_bound and form.is_valid():
+        # define customer para o formset
+        if form.is_bound and form.is_valid():
             customer = form.cleaned_data.get('customer')
         else:
-            customer = form.initial.get('customer') if form else None
+            customer = form.initial.get('customer')
 
         FormSet = self.get_formset_class()
-        context['items_formset'] = FormSet(
-            self.request.POST or None,
-            instance=self.object or Order(),
-            prefix=self.FORMSET_PREFIX,
-            form_kwargs={'customer': customer}
-        )
-        return context
+        if self.request.method == 'POST':
+            fs = FormSet(
+                self.request.POST,
+                instance=self.object or Order(),
+                prefix=self.FORMSET_PREFIX,
+                form_kwargs={'customer': customer}
+            )
+        else:
+            fs = FormSet(
+                instance=self.object or Order(),
+                prefix=self.FORMSET_PREFIX,
+                initial=self.request.session.get(self.sess_items_key, []),
+                form_kwargs={'customer': customer}
+            )
 
-    def post(self, request, *args, **kwargs):
-        self.object = None
-        form = self.get_form()
-        FormSet = self.get_formset_class()
-        formset = FormSet(
-            request.POST,
-            instance=Order(),
-            prefix=self.FORMSET_PREFIX,
-            form_kwargs={'customer': form.cleaned_data.get('customer') if form.is_valid() else None}
-        )
+        ctx['items_formset'] = fs
+        return ctx
 
-        if form.is_valid() and formset.is_valid():
-            self.object = form.save()
-            formset.instance = self.object
-            items = formset.save(commit=False)
-            for oi in items:
+    def form_valid(self, form):
+        # 1) salva a ordem
+        self.object = form.save()
+
+        # 2) salva o formset + lógica de margens
+        formset = self.get_context_data()['items_formset']
+        if formset.is_valid():
+            saved_items = formset.save(commit=False)
+            for oi in saved_items:
                 oi.cost_price = oi.item.cost_price
                 if oi.margin is None:
                     try:
@@ -298,15 +320,19 @@ class OrderCreateView(CreateView):
                     except CustomerItemMargin.DoesNotExist:
                         oi.margin = Decimal('0.00')
                 oi.save()
-            request.session.pop(self.sess_data_key,  None)
-            request.session.pop(self.sess_items_key, None)
+            # limpa sessão
+            self.request.session.pop(self.sess_data_key, None)
+            self.request.session.pop(self.sess_items_key, None)
             return redirect(self.success_url)
-        
-        return render(request, self.template_name, {
-            'form': form,
-            'items_formset': formset,
-        })
 
+        return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        # reusa o mesmo template, exibindo os erros de form + formset
+        return render(self.request, self.template_name, {
+            'form':           form,
+            'items_formset':  self.get_context_data()['items_formset'],
+        })
 
 class OrderUpdateView(UpdateView):
     model = Order
@@ -332,6 +358,32 @@ class OrderUpdateView(UpdateView):
             return redirect(self.get_success_url())
         else:
             return self.form_invalid(form)
+
+
+class UpdateOrderMarginsView(View):
+    def post(self, request, pk):
+        order = get_object_or_404(Order, pk=pk)
+        updated = 0
+
+        for oi in order.order_items.all():
+            # só atualiza quem ficou em branco na criação
+            if not oi.margin:
+                try:
+                    cim = CustomerItemMargin.objects.get(
+                        customer=order.customer,
+                        item=oi.item
+                    )
+                    oi.margin = cim.margin
+                except CustomerItemMargin.DoesNotExist:
+                    oi.margin = Decimal('0.00')
+                oi.save()  # save() recalcula sale_price
+                updated += 1
+
+        messages.success(request,
+            f"{updated} item(s) tiveram a margem padrão aplicada."
+        )
+        return redirect('orders:order-edit', pk=order.pk)
+    
 
 # —— BATCHES ——
 class AllBatchListView(ListView):

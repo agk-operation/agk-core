@@ -12,6 +12,9 @@
         <div class="mb-3">
           {{ import_form.file.label_tag }}
           {{ import_form.file }}
+        <input type="hidden" id="import-customer" name="customer" />
+        <input type="hidden" id="import-exporter" name="exporter" />
+        <input type="hidden" id="import-company"  name="company"  />
           {% for err in import_form.file.errors %}
             <div class="invalid-feedback d-block">{{ err }}</div>
           {% endfor %}

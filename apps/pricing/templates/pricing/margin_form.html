@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  {% if object %}Editar Margem{% else %}Nova Margem{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">
+    {% if object %}Editar Margem{% else %}Nova Margem{% endif %}
+  </h2>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for err in form.non_field_errors %}
+          <div>{{ err }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="mb-3">
+      {{ form.customer.label_tag }}  
+      {{ form.customer }}
+      {% if form.customer.errors %}
+        <div class="text-danger">{{ form.customer.errors|join:" " }}</div>
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      {{ form.item.label_tag }}
+      {{ form.item }}
+      {% if form.item.errors %}
+        <div class="text-danger">{{ form.item.errors|join:" " }}</div>
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      {{ form.margin.label_tag }}
+      <div class="input-group">
+        {{ form.margin }}
+        <span class="input-group-text">%</span>
+      </div>
+      {% if form.margin.errors %}
+        <div class="text-danger">{{ form.margin.errors|join:" " }}</div>
+      {% endif %}
+      {% if form.margin.help_text %}
+        <small class="form-text text-muted">{{ form.margin.help_text }}</small>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="btn btn-success">
+      {% if object %}Salvar Alterações{% else %}Criar Margem{% endif %}
+    </button>
+    <a href="{% url 'pricing:margin-list' %}" class="btn btn-secondary ms-2">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

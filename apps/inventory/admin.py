@@ -35,13 +35,6 @@ class ItemAdmin(admin.ModelAdmin):
     get_model_applications.short_description = "Model Applications"
 
 
-@admin.register(models.CustomerItemMargin)
-class CustomerItemMarginAdmin(admin.ModelAdmin):
-    list_display = ('customer','item','margin')
-    list_filter  = ('customer',)
-    search_fields= ('item__name',)
-
-
 @admin.register(models.Project)
 class ProjectAdmin(admin.ModelAdmin):
     list_display = ('name', 'description')

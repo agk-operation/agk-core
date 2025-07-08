@@ -219,6 +219,15 @@
     </div>
   </div>
 </div>
+<form id="import-form" 
+      method="post" 
+      action="{% url 'orders:order-item-import-new' %}" 
+      style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="customer" id="import-customer">
+  <input type="hidden" name="exporter" id="import-exporter">
+  <input type="hidden" name="company"  id="import-company">
+</form>
 
 {# ——— Template oculto para clonagem ——— #}
 <table class="d-none">

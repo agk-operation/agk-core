@@ -1,13 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const form       = document.getElementById('order-form');
-  const grid       = document.getElementById('items-grid');
-  const addBtn     = document.getElementById('add-item');
-  const importBtn  = document.getElementById('btn-import-items');
-  const templateEl = document.getElementById('empty-form-template');
-  const totalForms = document.querySelector('input[name$="-TOTAL_FORMS"]');
 
-  if (importBtn) {
-    importBtn.addEventListener('click', () => {
+  const grid         = document.getElementById('items-grid');
+  const addBtn       = document.getElementById('add-item');
+  const importNewBtn = document.getElementById('btn-import-items-new');
+  const importBtn    = document.getElementById('btn-import-items');
+  const templateEl   = document.getElementById('empty-form-template');
+  const totalForms   = document.querySelector('input[name$="-TOTAL_FORMS"]');
+
+  if (importNewBtn) {
+    importNewBtn.addEventListener('click', () => {
       const orderForm = document.getElementById('order-form');
       ['customer','exporter','company'].forEach(name => {
       const el = orderForm.querySelector(`[name="${name}"]`);
@@ -16,6 +17,29 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('import-form').submit();
     });
   }
+
+  if (importBtn) {
+        importBtn.addEventListener('click', () => {
+          window.location.href = importBtn.dataset.url;
+        });
+      }
+
+  const updateBtn = document.getElementById('btn-update-margins');
+      if (updateBtn) {
+        updateBtn.addEventListener('click', () => {
+          const url = updateBtn.dataset.updateUrl;
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = url;
+          const csrfInput = document.querySelector('#order-form input[name="csrfmiddlewaretoken"]');
+          if (csrfInput) {
+            const tokenClone = csrfInput.cloneNode();
+            form.appendChild(tokenClone);
+          }
+          document.body.appendChild(form);
+          form.submit();
+        });
+      }
 
   if (grid) {
     ['keydown','keypress'].forEach(evt =>

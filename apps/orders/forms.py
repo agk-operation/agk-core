@@ -1,4 +1,7 @@
 from django import forms
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Row, Column, Div, Field, HTML, Submit
+from crispy_forms.bootstrap import AppendedText
 from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet, inlineformset_factory
 from django.db.models import Sum
@@ -6,15 +9,118 @@ from .models import Order, OrderItem, OrderBatch, BatchItem, BatchStage
 from apps.pricing.models import CustomerItemMargin
 
 
+from django import forms
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Row, Column, Submit
+from crispy_forms.bootstrap import AppendedText
+from .models import Order
+
+
 class OrderForm(forms.ModelForm):
     class Meta:
         model = Order
-        fields = ['customer', 'exporter', 'company']
+        fields = [
+            'customer', 'exporter', 'company',
+            'validity', 'usd_rmb', 'usd_brl', 'required_schedule',
+            'asap', 'down_payment', 'pol', 'pod',
+            'sales_representative', 'business_unit', 'project', 'order_type',
+        ]
+        # centraliza classes comuns nos widgets
+        base_select = {'class': 'form-select form-select-sm'}
+        base_input = {'class': 'form-control form-control-sm'}
+
         widgets = {
-            'customer': forms.Select(attrs={'class': 'form-select'}),
-            'exporter': forms.Select(attrs={'class': 'form-select'}),
-            'company':  forms.Select(attrs={'class': 'form-select'}),
+            'customer': forms.Select(attrs=base_select),
+            'exporter': forms.Select(attrs=base_select),
+            'company': forms.Select(attrs=base_select),
+            'down_payment': forms.Select(attrs=base_select),
+            'pol': forms.Select(attrs=base_select),
+            'pod': forms.Select(attrs=base_select),
+            'sales_representative': forms.Select(attrs=base_select),
+            'business_unit': forms.Select(attrs=base_select),
+            'project': forms.Select(attrs=base_select),
+            'order_type': forms.Select(attrs=base_select),
+
+            'validity': forms.DateInput(
+                attrs={**base_input, 'type': 'date'}
+            ),
+            'required_schedule': forms.DateInput(
+                attrs={**base_input, 'type': 'date'}
+            ),
+            'usd_rmb': forms.NumberInput(
+                attrs={**base_input, 
+                       'type': 'number', 'step': '0.0001', 
+                       'min': '0', 'style': 'max-width:100px;',
+                       'placeholder' : '0.0000'
+                       }
+            ),
+            'usd_brl': forms.NumberInput(
+                attrs={**base_input, 'type': 'number', 'step': '0.0001', 
+                       'min': '0', 'style': 'max-width:100px;',
+                       'placeholder' : '0.0000'}
+            ),
+            'asap': forms.CheckboxInput(
+                attrs={'class': 'form-check-input', 'role': 'switch'}
+            ),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.layout = Layout(
+            Row(
+                Column('customer', css_class='col-md-4'),
+                Column('exporter', css_class='col-md-4'),
+                Column('company', css_class='col-md-4'),
+            ),
+            Row(
+                Column(
+                    Div(
+                        Div(
+                            Div(
+                                Field('required_schedule', css_class='form-control form-control-sm'),
+                                css_class='col'
+                            ),
+                            Div(
+                                Div(
+                                    Field('asap', css_class='form-check-input'),
+                                    css_class='form-check form-switch d-flex align-items-center'
+                                ),
+                                css_class='col-auto'
+                            ),
+                            css_class='row g-2 align-items-center'
+                        ),
+                    ),
+                    css_class='col-md-4'
+                ),
+
+                Column('pol', css_class='col-md-4'),
+                Column('pod', css_class='col-md-4'),
+            ),
+            Row(
+                Column('sales_representative', css_class='col-md-4'),
+                Column('business_unit', css_class='col-md-4'),
+                Column('project', css_class='col-md-4'),
+            ),
+            Row(
+                Column('order_type', css_class='col-md-4'),
+            ),
+            Row(
+                Column('validity', css_class='col-md-3'),
+                Column(
+                    AppendedText('usd_rmb', 'CNY → USD', wrapper_class='input-group input-group-sm'),
+                    css_class='col-md-3 align-self-center'
+                ),
+                Column(
+                    AppendedText('usd_brl', 'BRL → USD', wrapper_class='input-group input-group-sm'),
+                    css_class='col-md-3 align-self-center'
+                ),
+                Column('down_payment', css_class='col-md-3'),
+            ),
+        )
+
+
 
 
 class OrderItemForm(forms.ModelForm):
@@ -24,7 +130,10 @@ class OrderItemForm(forms.ModelForm):
         decimal_places=2,
         min_value=0,
         required=False,  # agora é opcional
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step':'0.01','min':0}),
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm', 
+                                        'step':'0.01','min':0,
+                                        'style': 'width:100px;', 
+        }),
         help_text="Deixe vazio para usar a margem padrão deste cliente/item."
     )
 
@@ -32,8 +141,13 @@ class OrderItemForm(forms.ModelForm):
         model = OrderItem
         fields = ('item', 'quantity', 'margin')
         widgets = {
-            'item': forms.Select(attrs={'class': 'form-select'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),   
+            'item': forms.Select(attrs={'class': 'form-select form-select-sm', 
+                                        'style': 'max-width:300px;',}
+            ),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control form-control-sm',
+                                                 'style': 'width:100px;', 
+                                                 'min': 1,
+            }),   
         }
 
     def __init__(self, *args, customer=None, **kwargs):

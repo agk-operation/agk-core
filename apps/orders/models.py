@@ -1,8 +1,9 @@
 from decimal import Decimal
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db.models import Sum
-from apps.core.models import Customer, Exporter, Company
+from apps.core.models import Customer, Exporter, Company, Port, SalesRepresentative, BusinessUnit, Project, OrderType
 from apps.inventory.models import Item
 
 
@@ -10,9 +11,54 @@ class Order(models.Model):
     customer  = models.ForeignKey(Customer, on_delete=models.PROTECT)
     exporter = models.ForeignKey(Exporter, on_delete=models.PROTECT)
     company = models.ForeignKey(Company, on_delete=models.PROTECT)
+    validity = models.DateTimeField(null=False, blank=False)
+    usd_rmb = models.DecimalField(
+        max_digits=12, 
+        decimal_places=6,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    usd_brl = models.DecimalField(
+        max_digits=12, 
+        decimal_places=6,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    required_schedule = models.DateTimeField(null=True, blank=True)
+    asap = models.BooleanField(null=True, blank=True)
+    down_payment = models.DecimalField(
+        max_digits=12, 
+        decimal_places=6,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Ex.: 20 = 20%",
+    )
+    pol = models.ForeignKey(
+        Port,
+        on_delete=models.PROTECT,
+        related_name='orders_as_pol',
+    )
+    pod = models.ForeignKey(
+        Port,
+        on_delete=models.PROTECT,
+        related_name='orders_as_pod',
+    )
+    sales_representative = models.ForeignKey(
+        SalesRepresentative, 
+        on_delete=models.PROTECT,
+    )
+    business_unit = models.ForeignKey(
+        BusinessUnit, 
+        on_delete=models.PROTECT,
+    )
+    project = models.ForeignKey(
+        Project, 
+        on_delete=models.PROTECT,
+    )
+    order_type = models.ForeignKey(
+        OrderType, 
+        on_delete=models.PROTECT,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
     def get_item_balances(self):
         """
         Retorna um queryset de OrderItem já anotado com:
@@ -28,6 +74,13 @@ class Order(models.Model):
                 )
         )
 
+    def clean(self):
+        super().clean()
+        if not self.asap and not self.required_schedule:
+            raise ValidationError({
+                'required_schedule': 'Este campo é obrigatório quando “asap” for falso.'
+            })
+    
     def __str__(self):
         return f"Ordem #{self.pk} - {self.customer.name}"
 

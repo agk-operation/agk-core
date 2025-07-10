@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load pagination_tags %}
+{% load crispy_forms_tags %}
 
 {% block title %}
   {% if object %}
@@ -21,10 +23,9 @@
 
   <div class="card">
     <div class="card-body">
-
       <form method="post" id="order-form" novalidate>
         {% csrf_token %}
-        {{ form.as_p }}
+        {% crispy form %}
 
         {# ——— Bloco de Lotes (só se já existir uma ordem) ——— #}
         {% if object %}
@@ -74,6 +75,7 @@
 
         {# ——— Bloco de Itens da Ordem ——— #}
         {{ items_formset.management_form }}
+        <input type="hidden" name="page" value="{{ items_page.number }}">
 
         {# Exibe erros não-field do formset #}
         {% if items_formset.non_form_errors %}
@@ -83,28 +85,48 @@
             {% endfor %}
           </div>
         {% endif %}
+        {% if messages %}
+          <div class="container mt-2">
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
         <div class="card mt-4">
-          <div class="card-header fw-bold">
+          <div class="card-header fw-bold d-flex align-items-center">
             Itens da Ordem
-            {% if object %}
-             <button
-               type="button"
-               id="btn-import-items"
-               class="btn btn-outline-primary float-end"
-               data-url="{% url 'orders:order-item-import' object.pk %}"
-             >
-               <i class="bi bi-upload"></i> Importar Itens
-             </button>
-           {% else %}
-             <button
-               type="button"
-               id="btn-import-items"
-               class="btn btn-outline-primary float-end"
-               data-url="{% url 'orders:order-item-import-new' %}"
-             >
-               <i class="bi bi-upload"></i> Importar Itens
-             </button>
-           {% endif %}
+            <div class="ms-auto d-flex gap-2">
+              {% if object %}
+                <button
+                  id="btn-update-margins"
+                  type="button"
+                  class="btn btn-warning btn-sm"
+                  data-update-url="{% url 'orders:order-update-margins' object.pk %}"
+                >
+                  <i class="bi bi-arrow-clockwise"></i> Atualizar Margens
+                </button>
+                <button
+                  id="btn-import-items"
+                  type="button"
+                  class="btn btn-outline-primary btn-sm"
+                  data-url="{% url 'orders:order-item-import' object.pk %}"
+                >
+                  <i class="bi bi-upload"></i> Importar Itens
+                </button>
+              {% else %}
+                <button
+                  type="button"
+                  id="btn-import-items-new"
+                  class="btn btn-outline-primary float-end"
+                  data-url="{% url 'orders:order-item-import-new' %}"
+                >
+                  <i class="bi bi-upload"></i> Importar Itens
+                </button>
+              {% endif %}
+          </div>
           </div>
           <div class="card-body p-0">
             {% if items_formset.non_form_errors %}
@@ -121,14 +143,14 @@
                   <th>Preço de Custo</th>
                   <th>Margem (%)</th>
                   <th>Preço de Venda</th>
+                  <th>Quantidade</th>
                   <th>Original</th>
                   <th>Saldo</th>
-                  <th>Quantidade</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody id="items-grid">
-                {% for subform in items_formset.forms %}
+                {% for subform in items_page.object_list %}
                 <tr class="item-row align-middle">
                   {# hidden: id, ORDER, DELETE #}
                   {% for hidden in subform.hidden_fields %}
@@ -143,7 +165,7 @@
                     {% endif %}
                   </td>
                   <td>
-                    {{ subform.instance.cost_price  }}
+                    <small>{{ subform.instance.cost_price }}</small>
                     {% if subform.instance.cost_price.errors %}
                       <div class="invalid-feedback d-block">
                         {{ subform.instance.cost_price.errors|join:" " }}
@@ -159,25 +181,11 @@
                     {% endif %}
                   </td>
                   <td>
-                    {{ subform.instance.sale_price }}
+                    <small>{{ subform.instance.sale_price }}</small>
                     {% if subform.instance.sale_price.errors %}
                       <div class="invalid-feedback d-block">
                         {{ subform.instance.sale_price.errors|join:" " }}
                       </div>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if subform.instance.pk %}
-                      {{ subform.instance.quantity }}
-                    {% else %}
-                      &mdash;
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if subform.instance.pk %}
-                      {{ subform.instance.remaining_qty }}
-                    {% else %}
-                      &mdash;
                     {% endif %}
                   </td>
                   <td>
@@ -186,6 +194,20 @@
                     <div class="invalid-feedback d-block">
                       {{ subform.quantity.errors|join:" " }}
                     </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if subform.instance.pk %}
+                      <small>{{ subform.instance.quantity }}</small>
+                    {% else %}
+                      &mdash;
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if subform.instance.pk %}
+                      <small>{{ subform.instance.remaining_qty }}</small>
+                    {% else %}
+                      &mdash;
                     {% endif %}
                   </td>
                   <td>
@@ -207,7 +229,9 @@
               Adicionar Item
             </button>
           </div>
-        </div>
+        </div> 
+        <div class="mt-4">
+          {% render_pagination items_page %}
         </div>
         <div class="mt-4 mb-4 ms-4">
           <button type="submit" class="btn btn-success">
@@ -237,12 +261,12 @@
         {{ hidden }}
       {% endfor %}
       <td>{{ items_formset.empty_form.item }}</td>
-      <td>{{ items_formset.empty_form.sale_price }}</td>
+      <td>{{ items_formset.empty_form.sale_price|default:"0.00" }}</td>
       <td>{{ items_formset.empty_form.margin }}</td>
-      <td>{{ items_formset.empty_form.cost_price }}</td>
-      <td>&mdash;</td>
-      <td>&mdash;</td>
+      <td>{{ items_formset.empty_form.cost_price|default:"0.00" }}</td>
       <td>{{ items_formset.empty_form.quantity }}</td>
+      <td>&mdash;</td>
+      <td>&mdash;</td>
       <td>
         <button type="button" class="btn btn-sm btn-danger remove-row">
           Remover

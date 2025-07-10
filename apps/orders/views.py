@@ -2,6 +2,7 @@ import pandas as pd
 from decimal import Decimal
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.core.paginator import Paginator
 from django.contrib import messages
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
@@ -246,12 +247,13 @@ class NewOrderItemsImportView(View):
 
 @method_decorator(never_cache, name='dispatch')
 class OrderCreateView(CreateView):
-    model           = Order
-    form_class      = OrderForm
-    template_name   = 'orders/order_form.html'
-    success_url     = reverse_lazy('orders:order-list')
-    sess_data_key   = NewOrderItemsImportView.session_data_key
-    sess_items_key  = NewOrderItemsImportView.session_items_key
+    model = Order
+    form_class = OrderForm
+    template_name = 'orders/order_form.html'
+    success_url = reverse_lazy('orders:order-list')
+    sess_data_key = NewOrderItemsImportView.session_data_key
+    sess_items_key = NewOrderItemsImportView.session_items_key
+    PAGINATE_BY = 5
     FORMSET_PREFIX  = 'orderitems'
 
     def get_initial(self):
@@ -270,12 +272,8 @@ class OrderCreateView(CreateView):
             extra=max(1, len(initial_items)),
             can_delete=True
         )
-
-    def get_context_data(self, **kwargs):
-        ctx  = super().get_context_data(**kwargs)
-        form = ctx['form']
-
-        # define customer para o formset
+    
+    def _build_formset(self, form):
         if form.is_bound and form.is_valid():
             customer = form.cleaned_data.get('customer')
         else:
@@ -296,15 +294,25 @@ class OrderCreateView(CreateView):
                 initial=self.request.session.get(self.sess_items_key, []),
                 form_kwargs={'customer': customer}
             )
+        return fs
 
+    def get_context_data(self, **kwargs):
+        ctx  = super().get_context_data(**kwargs)
+        fs = self._build_formset(ctx['form'])
+        paginator = Paginator(fs.forms, self.PAGINATE_BY)
+        page_number = (
+            self.request.POST.get('page') \
+            or self.request.GET.get('page') \
+            or 1
+        )
+        page_obj = paginator.get_page(page_number)
         ctx['items_formset'] = fs
+        ctx['items_page'] = page_obj
         return ctx
+    
 
     def form_valid(self, form):
-        # 1) salva a ordem
         self.object = form.save()
-
-        # 2) salva o formset + lógica de margens
         formset = self.get_context_data()['items_formset']
         if formset.is_valid():
             saved_items = formset.save(commit=False)
@@ -320,7 +328,7 @@ class OrderCreateView(CreateView):
                     except CustomerItemMargin.DoesNotExist:
                         oi.margin = Decimal('0.00')
                 oi.save()
-            # limpa sessão
+            # clean session
             self.request.session.pop(self.sess_data_key, None)
             self.request.session.pop(self.sess_items_key, None)
             return redirect(self.success_url)
@@ -328,11 +336,11 @@ class OrderCreateView(CreateView):
         return self.form_invalid(form)
 
     def form_invalid(self, form):
-        # reusa o mesmo template, exibindo os erros de form + formset
         return render(self.request, self.template_name, {
-            'form':           form,
-            'items_formset':  self.get_context_data()['items_formset'],
+            'form': form,
+            'items_formset': self.get_context_data()['items_formset'],
         })
+
 
 class OrderUpdateView(UpdateView):
     model = Order
@@ -341,12 +349,22 @@ class OrderUpdateView(UpdateView):
     success_url = reverse_lazy('orders:order-list')
 
     def get_context_data(self, **kwargs):
-        data = super().get_context_data(**kwargs)
+        ctx = super().get_context_data(**kwargs)
+        fs = self._build_formset(ctx['form'])
+        print(fs)
+        paginator = Paginator(fs.forms, OrderCreateView.PAGINATE_BY)
+        page_number = self.request.POST.get('page') \
+                      or self.request.GET.get('page') \
+                      or 1
+        page_obj = paginator.get_page(page_number)
+        ctx['items_formset'] = fs
+        ctx['items_page'] = page_obj
+        return ctx
+    
+    def _build_formset(self, form):
         if self.request.POST:
-            data['items_formset'] = OrderItemFormSet(self.request.POST, instance=self.object)
-        else:
-            data['items_formset'] = OrderItemFormSet(instance=self.object)
-        return data
+            return OrderItemFormSet(self.request.POST, instance=self.object)
+        return OrderItemFormSet(instance=self.object)
 
     def form_valid(self, form):
         context = self.get_context_data()
@@ -366,18 +384,15 @@ class UpdateOrderMarginsView(View):
         updated = 0
 
         for oi in order.order_items.all():
-            # só atualiza quem ficou em branco na criação
-            if not oi.margin:
-                try:
-                    cim = CustomerItemMargin.objects.get(
-                        customer=order.customer,
-                        item=oi.item
-                    )
+            if oi.margin is None:
+                cim = CustomerItemMargin.objects.filter(
+                    customer=order.customer,
+                    item=oi.item
+                ).first()
+                if cim:
                     oi.margin = cim.margin
-                except CustomerItemMargin.DoesNotExist:
-                    oi.margin = Decimal('0.00')
-                oi.save()  # save() recalcula sale_price
-                updated += 1
+                    oi.save()
+                    updated += 1
 
         messages.success(request,
             f"{updated} item(s) tiveram a margem padrão aplicada."

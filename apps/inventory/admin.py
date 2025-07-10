@@ -17,7 +17,8 @@ class ItemAdmin(admin.ModelAdmin):
 
     fieldsets = (
                 ('Basic Data', {
-                    'fields': ('name', 'category', 'subcategory', 'project', 'supplier', 'supplier_chain', 'chain')
+                    'fields': ('name', 'category', 'subcategory', 
+                               'project', 'supplier', 'supplier_chain', 'chain')
                 }),
                 ('Item Specifications' , {
                     'fields' : ('brand_manufacturer', 'ncm')

@@ -1,5 +1,5 @@
 from django.db import models
-from apps.core.models import Category, Supplier, Currency
+from apps.core.models import  Supplier, Currency
 
 
 class Project(models.Model):
@@ -126,7 +126,7 @@ class Item(models.Model):
 class ItemModelApplication(models.Model):
     item = models.ForeignKey('Item', on_delete=models.CASCADE)
     model_application = models.ForeignKey('ModelApplication', on_delete=models.CASCADE)
-    note = models.CharField(max_length=100, blank=True)  # opcional: você pode adicionar campos extras
+    note = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

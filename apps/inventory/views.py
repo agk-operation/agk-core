@@ -69,19 +69,12 @@ class ItemCreateUpdateView(View):
                 request.POST,
                 prefix=FORMSET_PREFIX
             )
-        print(">>> form valid?", form.is_valid())
-        print(">>> form errors:", form.errors)
-        print(">>> formset valid?", formset.is_valid())
-        print(">>> formset errors:", formset.errors)
-        print(">>> formset non_form_errors:", formset.non_form_errors())
         if form.is_valid() and formset.is_valid():
             obj = form.save()
             formset.instance = obj
             formset.save()
-            print('valid')
             return redirect(SUCCESS_URL)
 
-        print('invalid')
         return render(request, 'inventory/item_form.html', {
             'form': form,
             'formset': formset,
@@ -112,7 +105,7 @@ for model_name in RELATED_MODELS:
         {
             'model': model,
             'form_class': form_class,
-            'template_name': f'inventory/_generic_form.html',
+            'template_name': f'_generic_form.html',
             'success_url': reverse_lazy('inventory:item-create'),
             'extra_context': {
                 'model_name': model._meta.verbose_name.title()
@@ -126,7 +119,7 @@ for model_name in RELATED_MODELS:
         {
             'model': model,
             'form_class': form_class,
-            'template_name': f'inventory/_generic_form.html',
+            'template_name': f'_generic_form.html',
             'success_url': reverse_lazy('inventory:item-create'),
             'extra_context': {
                 'model_name': model._meta.verbose_name.title()

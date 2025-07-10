@@ -297,7 +297,7 @@ class OrderCreateView(CreateView):
         return fs
 
     def get_context_data(self, **kwargs):
-        ctx  = super().get_context_data(**kwargs)
+        ctx = super().get_context_data(**kwargs)
         fs = self._build_formset(ctx['form'])
         paginator = Paginator(fs.forms, self.PAGINATE_BY)
         page_number = (
@@ -328,7 +328,6 @@ class OrderCreateView(CreateView):
                     except CustomerItemMargin.DoesNotExist:
                         oi.margin = Decimal('0.00')
                 oi.save()
-            # clean session
             self.request.session.pop(self.sess_data_key, None)
             self.request.session.pop(self.sess_items_key, None)
             return redirect(self.success_url)

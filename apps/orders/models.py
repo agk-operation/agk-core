@@ -95,6 +95,12 @@ class OrderItem(models.Model):
         decimal_places=2, 
         default=Decimal('0.00')
     )
+    cost_price_usd = models.DecimalField(
+        "Preço de Custo em Dólar",
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal('0.00')
+    )
     margin = models.DecimalField(
         "Margem (%)",
         max_digits=5, 
@@ -134,6 +140,12 @@ class OrderItem(models.Model):
         cost = self.cost_price if self.cost_price is not None else Decimal("0.00")
         factor = Decimal("1.00") + (margin / Decimal("100.00"))
         self.sale_price = (cost * factor).quantize(Decimal("0.01"))
+
+        if self.item.currency == 'USD':
+            self.cost_price_usd = cost
+        else:
+            usd_rmb = getattr(self.order, 'usd_rmb', Decimal('0.00')) or Decimal('0.00')
+            self.cost_price_usd = (cost * usd_rmb).quantize(Decimal('0.01'))
 
         super().save(*args, **kwargs)
 

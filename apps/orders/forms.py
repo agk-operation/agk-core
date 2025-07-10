@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Div, Field, HTML, Submit
@@ -34,6 +35,12 @@ class OrderForm(forms.ModelForm):
             'exporter': forms.Select(attrs=base_select),
             'company': forms.Select(attrs=base_select),
             'down_payment': forms.Select(attrs=base_select),
+            'down_payment': forms.NumberInput(
+                attrs={**base_input, 
+                       'type': 'number', 'step': '0.01', 
+                       'min': '0', 'placeholder' : '0.00'
+                       }
+            ),
             'pol': forms.Select(attrs=base_select),
             'pod': forms.Select(attrs=base_select),
             'sales_representative': forms.Select(attrs=base_select),
@@ -109,18 +116,16 @@ class OrderForm(forms.ModelForm):
             Row(
                 Column('validity', css_class='col-md-3'),
                 Column(
-                    AppendedText('usd_rmb', 'CNY → USD', wrapper_class='input-group input-group-sm'),
+                    AppendedText('usd_rmb', 'USD → CNY', wrapper_class='input-group input-group-sm'),
                     css_class='col-md-3 align-self-center'
                 ),
                 Column(
-                    AppendedText('usd_brl', 'BRL → USD', wrapper_class='input-group input-group-sm'),
+                    AppendedText('usd_brl', 'USD → BRL', wrapper_class='input-group input-group-sm'),
                     css_class='col-md-3 align-self-center'
                 ),
                 Column('down_payment', css_class='col-md-3'),
             ),
         )
-
-
 
 
 class OrderItemForm(forms.ModelForm):
@@ -147,12 +152,13 @@ class OrderItemForm(forms.ModelForm):
             'quantity': forms.NumberInput(attrs={'class': 'form-control form-control-sm',
                                                  'style': 'width:100px;', 
                                                  'min': 1,
-            }),   
+            }),
         }
 
-    def __init__(self, *args, customer=None, **kwargs):
+    def __init__(self, *args, customer=None, usd_rmb : Decimal=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.customer = customer
+        self.usd_rmb = usd_rmb or Decimal('0')
 
         # se for criação (sem pk) e tiver customer, tentar pré-preencher
         if not self.instance.pk and customer and 'item' in self.initial:
@@ -162,8 +168,12 @@ class OrderItemForm(forms.ModelForm):
                     item=self.initial['item']
                 )
                 self.fields['margin'].initial = cim.margin
+
             except CustomerItemMargin.DoesNotExist:
                 pass
+
+        if self.instance.pk:
+            self.fields['cost_price_usd'].initial = self.instance.cost_price_usd
 
 
 OrderItemFormSet = inlineformset_factory(
@@ -173,7 +183,6 @@ OrderItemFormSet = inlineformset_factory(
     can_delete=True
 )
 
-
 class BatchItemForm(forms.ModelForm):
     class Meta:
         model = BatchItem
@@ -182,7 +191,6 @@ class BatchItemForm(forms.ModelForm):
             'order_item': forms.Select(attrs={'class': 'form-select'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
         }
-
 
 
 class BaseBatchItemFormSet(BaseInlineFormSet):
@@ -204,7 +212,6 @@ class BaseBatchItemFormSet(BaseInlineFormSet):
             form.fields['order_item'].queryset = allowed_qs
 
         self.empty_form.fields['order_item'].queryset = allowed_qs
-
 
     def clean(self):
         super().clean()
@@ -242,7 +249,6 @@ class BaseBatchItemFormSet(BaseInlineFormSet):
         if errors:
             raise ValidationError("Existem itens com quantidade maior do que o disponível.")
         
-
 # final inlineformset, referenciando o BaseBatchItemFormSet
 BatchItemFormSet = inlineformset_factory(
     OrderBatch, BatchItem,

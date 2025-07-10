@@ -24,7 +24,15 @@
   <div class="card">
     <div class="card-body">
       <form method="post" id="order-form" novalidate>
+        
         {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for err in form.non_field_errors %}
+              <div>{{ err }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
         {% crispy form %}
 
         {# ——— Bloco de Lotes (só se já existir uma ordem) ——— #}
@@ -141,6 +149,7 @@
                 <tr>
                   <th>Item</th>
                   <th>Preço de Custo</th>
+                  <th>Preço de Custo USD</th>
                   <th>Margem (%)</th>
                   <th>Preço de Venda</th>
                   <th>Quantidade</th>
@@ -169,6 +178,14 @@
                     {% if subform.instance.cost_price.errors %}
                       <div class="invalid-feedback d-block">
                         {{ subform.instance.cost_price.errors|join:" " }}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <small>{{ subform.instance.cost_price_usd }}</small>
+                    {% if subform.instance.cost_price_usd.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ subform.instance.cost_price_usd.errors|join:" " }}
                       </div>
                     {% endif %}
                   </td>
@@ -261,9 +278,10 @@
         {{ hidden }}
       {% endfor %}
       <td>{{ items_formset.empty_form.item }}</td>
-      <td>{{ items_formset.empty_form.sale_price|default:"0.00" }}</td>
+      <td><small>{{ items_formset.empty_form.cost_price|default:"0.00" }}</small></td>
+      <td><small>{{ items_formset.empty_form.cost_price_usd|default:"0.00" }}</small></td>
       <td>{{ items_formset.empty_form.margin }}</td>
-      <td>{{ items_formset.empty_form.cost_price|default:"0.00" }}</td>
+      <td><small>{{ items_formset.empty_form.sale_price|default:"0.00" }}</small></td>
       <td>{{ items_formset.empty_form.quantity }}</td>
       <td>&mdash;</td>
       <td>&mdash;</td>

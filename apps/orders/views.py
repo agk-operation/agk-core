@@ -1,7 +1,7 @@
 import pandas as pd
 from decimal import Decimal
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.utils.decorators import method_decorator
@@ -297,8 +297,8 @@ class OrderCreateView(CreateView):
         return fs
 
     def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        fs = self._build_formset(ctx['form'])
+        context = super().get_context_data(**kwargs)
+        fs = self._build_formset(context['form'])
         paginator = Paginator(fs.forms, self.PAGINATE_BY)
         page_number = (
             self.request.POST.get('page') \
@@ -306,11 +306,10 @@ class OrderCreateView(CreateView):
             or 1
         )
         page_obj = paginator.get_page(page_number)
-        ctx['items_formset'] = fs
-        ctx['items_page'] = page_obj
-        return ctx
+        context['items_formset'] = fs
+        context['items_page'] = page_obj
+        return context
     
-
     def form_valid(self, form):
         self.object = form.save()
         formset = self.get_context_data()['items_formset']
@@ -330,6 +329,7 @@ class OrderCreateView(CreateView):
                 oi.save()
             self.request.session.pop(self.sess_data_key, None)
             self.request.session.pop(self.sess_items_key, None)
+            
             return redirect(self.success_url)
 
         return self.form_invalid(form)
@@ -339,6 +339,11 @@ class OrderCreateView(CreateView):
             'form': form,
             'items_formset': self.get_context_data()['items_formset'],
         })
+    
+    def get_success_url(self):
+        if self.request.POST.get('action') == 'save_continue':
+            return reverse('orders:order-edit', args=[self.object.pk])
+        return super().get_success_url()
 
 
 class OrderUpdateView(UpdateView):
@@ -346,35 +351,120 @@ class OrderUpdateView(UpdateView):
     form_class = OrderForm
     template_name = 'orders/order_form.html'
     success_url = reverse_lazy('orders:order-list')
+    FORMSET_PREFIX  = 'orderitems'
+    PAGINATE_BY = 5
 
+    def get_orderitems_qs(self):
+        """Queryset completo dos OrderItem desta ordem, ordenado."""
+        return OrderItem.objects.filter(order=self.object).order_by('pk')
+
+    def _build_formset(self, form, page):
+        if form.is_bound and form.is_valid():
+            customer = form.cleaned_data.get('customer')
+            usd_rmb   = form.cleaned_data.get('usd_rmb') or Decimal('0')
+        else:
+            customer = form.initial.get('customer')
+            usd_rmb   = form.initial.get('usd_rmb') or Decimal('0')
+
+        qs_all  = self.get_orderitems_qs()
+        offset  = (page - 1) * self.PAGINATE_BY
+        qs_page = qs_all[offset: offset + self.PAGINATE_BY]
+
+        FormSet = self.get_formset_class()
+        if self.request.method == 'POST':
+            fs = FormSet(
+                self.request.POST,
+                instance=self.object or Order(),
+                prefix=self.FORMSET_PREFIX,
+                form_kwargs={'customer': customer, 
+                             'usd_rmb': usd_rmb},
+                queryset=qs_page
+            )
+        else:
+            fs = FormSet(
+                instance=self.object or Order(),
+                prefix=self.FORMSET_PREFIX,
+                form_kwargs={'customer': customer,
+                             'usd_rmb': usd_rmb},
+                queryset=qs_page,
+            )
+        return fs
+    
+    def get_formset_class(self):
+        return inlineformset_factory(
+            Order,
+            OrderItem,
+            form=OrderItemForm,
+            extra=1,
+            can_delete=True
+        )
+    
     def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        fs = self._build_formset(ctx['form'])
-        print(fs)
+        context = super().get_context_data(**kwargs)
+        form = context['form']
+        page = int(self.request.GET.get('page', 1) or
+                   self.request.POST.get('page', 1))
+        fs = self._build_formset(form, page)
         paginator = Paginator(fs.forms, OrderCreateView.PAGINATE_BY)
         page_number = self.request.POST.get('page') \
                       or self.request.GET.get('page') \
                       or 1
         page_obj = paginator.get_page(page_number)
-        ctx['items_formset'] = fs
-        ctx['items_page'] = page_obj
-        return ctx
-    
-    def _build_formset(self, form):
-        if self.request.POST:
-            return OrderItemFormSet(self.request.POST, instance=self.object)
-        return OrderItemFormSet(instance=self.object)
+        context['items_formset'] = fs
+        context['items_page'] = page_obj
+        return context    
 
     def form_valid(self, form):
-        context = self.get_context_data()
-        items_fs = context['items_formset']
-        if items_fs.is_valid():
-            self.object = form.save()
-            items_fs.instance = self.object
-            items_fs.save()
+        # 1) Salva a Order (rodando Order.save())
+        self.object = form.save()
+
+        page = int(self.request.POST.get('page', 1))
+        fs   = self._build_formset(form, page)
+        if fs.is_valid():
+            # 2a) Obtém instâncias sem salvar ao banco ainda
+            saved_items = fs.save(commit=False)
+
+            # 2b) Exclui os marcados para remoção
+            for oi in fs.deleted_objects:
+                oi.delete()
+
+            # 3) Itera só sobre os novos (oi.pk é None)…
+            for oi in saved_items:
+                oi.cost_price = oi.item.cost_price
+
+                # **Somente para novos** e se margin for None
+                if oi.pk is None and oi.margin is None:
+                    try:
+                        cim = CustomerItemMargin.objects.get(
+                            customer=self.object.customer,
+                            item=oi.item
+                        )
+                        oi.margin = cim.margin
+                    except CustomerItemMargin.DoesNotExist:
+                        oi.margin = Decimal('0.00')
+
+                # O save() dispara OrderItem.save(), que recalcula
+                # tanto sale_price quanto cost_price_usd
+                oi.save()
+            # se houver próxima página, redireciona para ela
+            paginator = Paginator(self.get_orderitems_qs(), self.PAGINATE_BY)
+            if page < paginator.num_pages:
+                return redirect(f"{self.request.path}?page={page+1}")
+
+            # senão acabou—vai pra lista
             return redirect(self.get_success_url())
-        else:
-            return self.form_invalid(form)
+
+        # se o formset tiver erros, renderizamos o form com erros
+        return self.form_invalid(form)
+    
+    def form_invalid(self, form):
+        context = self.get_context_data(form=form)
+        return render(self.request, self.template_name, context)
+    
+    def get_success_url(self):
+        if self.request.POST.get('action') == 'save_continue':
+            return reverse('orders:order-edit', args=[self.object.pk])
+        return super().get_success_url()
 
 
 class UpdateOrderMarginsView(View):

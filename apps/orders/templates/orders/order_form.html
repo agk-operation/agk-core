@@ -86,13 +86,6 @@
         <input type="hidden" name="page" value="{{ items_page.number }}">
 
         {# Exibe erros não-field do formset #}
-        {% if items_formset.non_form_errors %}
-          <div class="alert alert-danger">
-            {% for err in items_formset.non_form_errors %}
-              <div>{{ err }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
         {% if messages %}
           <div class="container mt-2">
             {% for message in messages %}
@@ -250,9 +243,19 @@
         <div class="mt-4">
           {% render_pagination items_page %}
         </div>
-        <div class="mt-4 mb-4 ms-4">
-          <button type="submit" class="btn btn-success">
-            Salvar Ordem
+        <div class="d-flex gap-2 mt-4 mb-4 ms-4">
+          <!-- Botão padrão: salva e sai -->
+          <button type="submit" name="action" value="save_exit" 
+                  class="btn btn-success"
+                  form="order-form">
+            Save
+          </button>
+
+          <!-- Novo botão: salva e continua -->
+          <button type="submit" name="action" value="save_continue" 
+                  class="btn btn-outline-primary"
+                  form="order-form">
+            Save & Continue
           </button>
         </div>
       </form>
@@ -297,5 +300,5 @@
 
 {% block scripts %}
   <script src="{% static 'js/order_formsets.js' %}"></script>
-  <script src="{% static 'js/import_order_item.js' %}"></script>
+  <script src="{% static 'js/import_order_itens.js' %}"></script>
 {% endblock %}

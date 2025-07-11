@@ -136,16 +136,15 @@ class OrderItem(models.Model):
         return self.quantity - self.shipped_qty
 
     def save(self, *args, **kwargs):
-        margin = self.margin if self.margin is not None else Decimal("0.00")
-        cost = self.cost_price if self.cost_price is not None else Decimal("0.00")
-        factor = Decimal("1.00") + (margin / Decimal("100.00"))
-        self.sale_price = (cost * factor).quantize(Decimal("0.01"))
-
         if self.item.currency == 'USD':
-            self.cost_price_usd = cost
+            self.cost_price_usd = self.cost_price or Decimal('0.00')
         else:
             usd_rmb = getattr(self.order, 'usd_rmb', Decimal('0.00')) or Decimal('0.00')
-            self.cost_price_usd = (cost * usd_rmb).quantize(Decimal('0.01'))
+            self.cost_price_usd = (self.cost_price * usd_rmb).quantize(Decimal('0.01')) or Decimal('0.00')
+
+        margin = self.margin if self.margin is not None else Decimal("0.00")
+        factor = Decimal("1.00") + (margin / Decimal("100.00"))
+        self.sale_price = (self.cost_price_usd * factor).quantize(Decimal("0.01"))
 
         super().save(*args, **kwargs)
 

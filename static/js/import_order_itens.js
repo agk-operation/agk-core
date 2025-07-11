@@ -10,9 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const company  = form.querySelector('[name="company"]')?.value  || '';
 
     // 2) Copia o valor para os hidden inputs do form de import
-    document.getElementById('import-customer').value = customer?.value || '';
-    document.getElementById('import-exporter').value = exporter?.value || '';
-    document.getElementById('import-company').value  = company?.value  || '';
+    document.getElementById('import-customer').value = customer;
+    document.getElementById('import-exporter').value = exporter;
+    document.getElementById('import-company').value  = company;
     // agora o GET vai incluir esses hidden fields na URL
   });
 });

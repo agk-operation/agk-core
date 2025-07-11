@@ -74,6 +74,7 @@ class OrderForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper(self)
+        self.helper.form_tag = False
         self.helper.form_method = 'post'
         self.helper.layout = Layout(
             Row(
@@ -172,8 +173,6 @@ class OrderItemForm(forms.ModelForm):
             except CustomerItemMargin.DoesNotExist:
                 pass
 
-        if self.instance.pk:
-            self.fields['cost_price_usd'].initial = self.instance.cost_price_usd
 
 
 OrderItemFormSet = inlineformset_factory(

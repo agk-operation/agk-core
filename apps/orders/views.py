@@ -347,92 +347,88 @@ class OrderCreateView(CreateView):
 
 
 class OrderUpdateView(UpdateView):
-    model = Order
-    form_class = OrderForm
-    template_name = 'orders/order_form.html'
-    success_url = reverse_lazy('orders:order-list')
+    model           = Order
+    form_class      = OrderForm
+    template_name   = 'orders/order_form.html'
+    success_url     = reverse_lazy('orders:order-list')
     FORMSET_PREFIX  = 'orderitems'
-    PAGINATE_BY = 5
+    PAGINATE_BY     = 10
 
     def get_orderitems_qs(self):
-        """Queryset completo dos OrderItem desta ordem, ordenado."""
         return OrderItem.objects.filter(order=self.object).order_by('pk')
 
-    def _build_formset(self, form, page):
-        if form.is_bound and form.is_valid():
-            customer = form.cleaned_data.get('customer')
-            usd_rmb   = form.cleaned_data.get('usd_rmb') or Decimal('0')
-        else:
-            customer = form.initial.get('customer')
-            usd_rmb   = form.initial.get('usd_rmb') or Decimal('0')
-
-        qs_all  = self.get_orderitems_qs()
-        offset  = (page - 1) * self.PAGINATE_BY
-        qs_page = qs_all[offset: offset + self.PAGINATE_BY]
-
-        FormSet = self.get_formset_class()
-        if self.request.method == 'POST':
-            fs = FormSet(
-                self.request.POST,
-                instance=self.object or Order(),
-                prefix=self.FORMSET_PREFIX,
-                form_kwargs={'customer': customer, 
-                             'usd_rmb': usd_rmb},
-                queryset=qs_page
-            )
-        else:
-            fs = FormSet(
-                instance=self.object or Order(),
-                prefix=self.FORMSET_PREFIX,
-                form_kwargs={'customer': customer,
-                             'usd_rmb': usd_rmb},
-                queryset=qs_page,
-            )
-        return fs
-    
     def get_formset_class(self):
         return inlineformset_factory(
             Order,
             OrderItem,
             form=OrderItemForm,
-            extra=1,
+            extra=0,
             can_delete=True
         )
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        form = context['form']
-        page = int(self.request.GET.get('page', 1) or
-                   self.request.POST.get('page', 1))
-        fs = self._build_formset(form, page)
-        paginator = Paginator(fs.forms, OrderCreateView.PAGINATE_BY)
-        page_number = self.request.POST.get('page') \
-                      or self.request.GET.get('page') \
-                      or 1
+
+    def _build_formset(self, form, page_number):
+        # 1) extrai customer e usd_rmb do form pai
+        if form.is_bound and form.is_valid():
+            customer = form.cleaned_data.get('customer')
+            usd_rmb = form.cleaned_data.get('usd_rmb') or Decimal('0')
+        else:
+            customer = form.initial.get('customer')
+            usd_rmb = form.initial.get('usd_rmb') or Decimal('0')
+
+        # 2) determina quais PKs pertencem à fatia atual
+        full_qs = self.get_orderitems_qs()
+        paginator = Paginator(full_qs, self.PAGINATE_BY)
         page_obj = paginator.get_page(page_number)
-        context['items_formset'] = fs
-        context['items_page'] = page_obj
-        return context    
+        slice_pks = [oi.pk for oi in page_obj.object_list]
+        page_qs = full_qs.filter(pk__in=slice_pks)
+        # 3) monta o formset apenas com esses itens
+        FormSet = self.get_formset_class()
+        kwargs = {
+            'instance': self.object,
+            'prefix': self.FORMSET_PREFIX,
+            'queryset':  page_qs,
+            'form_kwargs': {
+                'customer': customer,
+                'usd_rmb': usd_rmb,
+            }
+        }       
+        if self.request.method == 'POST':
+            return FormSet(self.request.POST, **kwargs), page_obj
+
+        return FormSet(**kwargs), page_obj
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        form = ctx['form']
+        # 4) lê page de GET (ou de POST, caso venha via hidden input)
+        page_number = int(self.request.GET.get('page', 1) or
+                          self.request.POST.get('page', 1) or
+                          1
+        )
+        fs, page_obj = self._build_formset(form, page_number)
+
+        ctx['items_formset'] = fs
+        ctx['items_page'] = page_obj
+        return ctx
 
     def form_valid(self, form):
-        # 1) Salva a Order (rodando Order.save())
+        # 5) salva a Order
         self.object = form.save()
 
-        page = int(self.request.POST.get('page', 1))
-        fs   = self._build_formset(form, page)
-        if fs.is_valid():
-            # 2a) Obtém instâncias sem salvar ao banco ainda
-            saved_items = fs.save(commit=False)
+        # 6) pega o formset da página e salva apenas aqueles itens
+        page_number = int(self.request.POST.get('page', 1))
+        fs, page_obj = self._build_formset(form, page_number)
 
-            # 2b) Exclui os marcados para remoção
+        if fs.is_valid():
+            saved_items = fs.save(commit=False)
+            # itens marcados para exclusão
             for oi in fs.deleted_objects:
                 oi.delete()
 
-            # 3) Itera só sobre os novos (oi.pk é None)…
             for oi in saved_items:
+                # aplica sempre o cost_price
                 oi.cost_price = oi.item.cost_price
-
-                # **Somente para novos** e se margin for None
+                # margem padrão só para itens novos sem margin
                 if oi.pk is None and oi.margin is None:
                     try:
                         cim = CustomerItemMargin.objects.get(
@@ -442,22 +438,19 @@ class OrderUpdateView(UpdateView):
                         oi.margin = cim.margin
                     except CustomerItemMargin.DoesNotExist:
                         oi.margin = Decimal('0.00')
-
-                # O save() dispara OrderItem.save(), que recalcula
-                # tanto sale_price quanto cost_price_usd
                 oi.save()
-            # se houver próxima página, redireciona para ela
-            paginator = Paginator(self.get_orderitems_qs(), self.PAGINATE_BY)
-            if page < paginator.num_pages:
-                return redirect(f"{self.request.path}?page={page+1}")
 
-            # senão acabou—vai pra lista
+            # se tiver próxima página, segue para ela
+            if page_obj.has_next():
+                return redirect(f"{self.request.path}?page={page_number+1}")
+
+            # senão, acabou → volta para a lista
             return redirect(self.get_success_url())
 
-        # se o formset tiver erros, renderizamos o form com erros
         return self.form_invalid(form)
-    
+
     def form_invalid(self, form):
+        # garante form + formset(paginado) com erros
         context = self.get_context_data(form=form)
         return render(self.request, self.template_name, context)
     

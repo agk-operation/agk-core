@@ -152,8 +152,10 @@
                 </tr>
               </thead>
               <tbody id="items-grid">
-                {% for subform in items_page.object_list %}
+                {% for subform in items_formset %}
                 <tr class="item-row align-middle">
+                  {{ items_formset.management_form }}
+                  <input type="hidden" name="page" value="{{ items_page.number }}"> 
                   {# hidden: id, ORDER, DELETE #}
                   {% for hidden in subform.hidden_fields %}
                     {{ hidden }}

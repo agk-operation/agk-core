@@ -174,7 +174,6 @@ class OrderItemForm(forms.ModelForm):
                 pass
 
 
-
 OrderItemFormSet = inlineformset_factory(
     Order, OrderItem,
     form=OrderItemForm,

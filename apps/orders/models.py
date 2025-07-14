@@ -78,7 +78,7 @@ class Order(models.Model):
         super().clean()
         if not self.asap and not self.required_schedule:
             raise ValidationError({
-                'required_schedule': 'Este campo é obrigatório quando “asap” for falso.'
+                'required_schedule': 'This field is required when “asap” is false.'
             })
     
     def __str__(self):
@@ -90,19 +90,19 @@ class OrderItem(models.Model):
     item = models.ForeignKey(Item, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
     cost_price = models.DecimalField(
-        "Preço de Custo",
+        "Cost Price",
         max_digits=12, 
         decimal_places=2, 
         default=Decimal('0.00')
     )
     cost_price_usd = models.DecimalField(
-        "Preço de Custo em Dólar",
+        "Dolar Cost Price",
         max_digits=12, 
         decimal_places=2, 
         default=Decimal('0.00')
     )
     margin = models.DecimalField(
-        "Margem (%)",
+        "Margin (%)",
         max_digits=5, 
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0.00"))],
@@ -111,7 +111,7 @@ class OrderItem(models.Model):
         help_text="Ex.: 20 = 20%"
     )
     sale_price = models.DecimalField(
-        "Preço de Venda",
+        "Sale Price",
         max_digits=12, 
         decimal_places=2,
         default=Decimal('0.00'),
@@ -190,12 +190,12 @@ class BatchStage(models.Model):
     )
     name = models.CharField("Etapa", max_length=100)
     estimated_completion = models.DateField(
-        "Data Estimada",
+        "Estimed Date",
         null=True,
         blank=True,
     )
     actual_completion = models.DateField(
-        "Data Efetiva",
+        "Actual Date",
         null=True,
         blank=True
     )
@@ -204,8 +204,8 @@ class BatchStage(models.Model):
 
 
     class Meta:
-        verbose_name = "Etapa de Lote"
-        verbose_name_plural = "Etapas de Lote"
+        verbose_name = "Batch Stage"
+        verbose_name_plural = "Batch Stages"
         ordering = ['estimated_completion']
 
     def __str__(self):

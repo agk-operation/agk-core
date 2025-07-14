@@ -46,11 +46,10 @@ class OrderItemsImportView(View):
     """
     Importa linhas de CSV/XLSX criando OrderItem em um Order já salvo.
     """
-    template_name     = 'orders/order_items_import.html'
-    form_class        = OrderItemsImportForm
+    template_name = 'orders/order_items_import.html'
+    form_class = OrderItemsImportForm
 
     def dispatch(self, request, *args, **kwargs):
-        # carrega a ordem existente
         self.order = get_object_or_404(Order, pk=kwargs['pk'])
         return super().dispatch(request, *args, **kwargs)
 
@@ -58,7 +57,7 @@ class OrderItemsImportView(View):
         form = self.form_class()
         return render(request, self.template_name, {
             'import_form': form,
-            'order':       self.order,
+            'order': self.order,
         })
 
     def post(self, request, *args, **kwargs):
@@ -66,7 +65,7 @@ class OrderItemsImportView(View):
         if not form.is_valid():
             return render(request, self.template_name, {
                 'import_form': form,
-                'order':       self.order,
+                'order': self.order,
             })
 
         # lê o arquivo
@@ -78,7 +77,7 @@ class OrderItemsImportView(View):
             form.add_error(None, f'Erro ao ler o arquivo: {e}')
             return render(request, self.template_name, {
                 'import_form': form,
-                'order':       self.order,
+                'order': self.order,
             })
 
         # verifica colunas
@@ -88,7 +87,7 @@ class OrderItemsImportView(View):
             form.add_error(None, f'Colunas inválidas, precisa ter: {expected}')
             return render(request, self.template_name, {
                 'import_form': form,
-                'order':       self.order,
+                'order': self.order,
             })
 
         # valida e cria
@@ -111,11 +110,20 @@ class OrderItemsImportView(View):
                 continue
 
             # tudo ok, cria o OrderItem
-            OrderItem.objects.create(
-                order    = self.order,
-                item     = inv_item,
-                quantity = qty
+            oi = OrderItem.objects.create(
+                order = self.order,
+                item = inv_item,
+                quantity = qty, 
+                cost_price = inv_item.cost_price,   
             )
+            try:
+                cim = CustomerItemMargin.objects.get(
+                    customer = self.order.customer,
+                    item     = inv_item
+                )
+                oi.margin = cim.margin
+            except CustomerItemMargin.DoesNotExist:
+                oi.margin = Decimal('0.00')
             created += 1
 
         if errors:
@@ -440,11 +448,9 @@ class OrderUpdateView(UpdateView):
                         oi.margin = Decimal('0.00')
                 oi.save()
 
-            # se tiver próxima página, segue para ela
             if page_obj.has_next():
-                return redirect(f"{self.request.path}?page={page_number+1}")
+                return redirect(f"{self.request.path}?page={page_number}")
 
-            # senão, acabou → volta para a lista
             return redirect(self.get_success_url())
 
         return self.form_invalid(form)

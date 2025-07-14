@@ -5,9 +5,9 @@
 
 {% block title %}
   {% if object %}
-    Ordem {{ object.pk }}
+    Order {{ object.pk }}
   {% else %}
-    Nova Ordem
+    Add order
   {% endif %}
 {% endblock %}
 
@@ -15,9 +15,9 @@
 <div class="container mt-4">
   <h3 class="display-6">
     {% if object %}
-      Editar Ordem {{ object.pk }}
+      Edit Order {{ object.pk }}
     {% else %}
-      Nova Ordem
+      Add Order
     {% endif %}
   </h3>
 
@@ -33,15 +33,25 @@
             {% endfor %}
           </div>
         {% endif %}
-        {% crispy form %}
+
+        <div class="card mt-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Order Infos</span>
+          </div>
+          <div class="card-body p-0">
+            <div>
+              {% crispy form %}
+            </div>
+          </div>
+        </div>
 
         {# ——— Bloco de Lotes (só se já existir uma ordem) ——— #}
         {% if object %}
         <div class="card mt-4">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <span class="fw-bold">Lotes da Ordem</span>
+            <span class="fw-bold">Order Batches</span>
             <a href="{% url 'orders:batch-add' object.pk %}" class="btn btn-sm btn-success">
-              + Novo Lote
+              + New Batch
             </a>
           </div>
           <div class="card-body p-0">
@@ -49,22 +59,22 @@
             <table class="table mb-0">
               <thead class="table-light">
                 <tr>
-                  <th>Código</th>
+                  <th>Code</th>
                   <th>Status</th>
-                  <th>Criado em</th>
-                  <th>Ações</th>
+                  <th>Created at</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {% for lote in object.batches.all %}
+                {% for batch in object.batches.all %}
                 <tr>
-                  <td>{{ lote.batch_code }}</td>
-                  <td>{{ lote.get_status_display }}</td>
-                  <td>{{ lote.created_at|date:"d/m/Y H:i" }}</td>
+                  <td>{{ batch.batch_code }}</td>
+                  <td>{{ batch.get_status_display }}</td>
+                  <td>{{ batch.created_at|date:"d/m/Y H:i" }}</td>
                   <td>
                     <a href="{% url 'orders:order-batch-list' object.pk %}"
                        class="btn btn-sm btn-outline-primary">
-                      Ver Lotes
+                      View Batches
                     </a>
                   </td>
                 </tr>
@@ -72,7 +82,7 @@
               </tbody>
             </table>
             {% else %}
-            <div class="alert alert-info mb-0">Nenhum lote criado.</div>
+            <div class="alert alert-info mb-0">No Batch Created.</div>
             {% endif %}
           </div>
           <div class="card-footer border-0 bg-white">
@@ -98,7 +108,7 @@
         {% endif %}
         <div class="card mt-4">
           <div class="card-header fw-bold d-flex align-items-center">
-            Itens da Ordem
+            Order Items
             <div class="ms-auto d-flex gap-2">
               {% if object %}
                 <button
@@ -107,7 +117,7 @@
                   class="btn btn-warning btn-sm"
                   data-update-url="{% url 'orders:order-update-margins' object.pk %}"
                 >
-                  <i class="bi bi-arrow-clockwise"></i> Atualizar Margens
+                  <i class="bi bi-arrow-clockwise"></i> Update Margins
                 </button>
                 <button
                   id="btn-import-items"
@@ -115,7 +125,7 @@
                   class="btn btn-outline-primary btn-sm"
                   data-url="{% url 'orders:order-item-import' object.pk %}"
                 >
-                  <i class="bi bi-upload"></i> Importar Itens
+                  <i class="bi bi-upload"></i> Import Items
                 </button>
               {% else %}
                 <button
@@ -124,7 +134,7 @@
                   class="btn btn-outline-primary float-end"
                   data-url="{% url 'orders:order-item-import-new' %}"
                 >
-                  <i class="bi bi-upload"></i> Importar Itens
+                  <i class="bi bi-upload"></i> Import Items
                 </button>
               {% endif %}
           </div>
@@ -141,21 +151,19 @@
               <thead class="table-light">
                 <tr>
                   <th>Item</th>
-                  <th>Preço de Custo</th>
-                  <th>Preço de Custo USD</th>
-                  <th>Margem (%)</th>
-                  <th>Preço de Venda</th>
-                  <th>Quantidade</th>
+                  <th>Cost Price</th>
+                  <th>Cost Price USD</th>
+                  <th>Margin (%)</th>
+                  <th>Sale Price</th>
+                  <th>Quantity</th>
                   <th>Original</th>
-                  <th>Saldo</th>
-                  <th>Ações</th>
+                  <th>Balance</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="items-grid">
                 {% for subform in items_formset %}
                 <tr class="item-row align-middle">
-                  {{ items_formset.management_form }}
-                  <input type="hidden" name="page" value="{{ items_page.number }}"> 
                   {# hidden: id, ORDER, DELETE #}
                   {% for hidden in subform.hidden_fields %}
                     {{ hidden }}
@@ -175,9 +183,8 @@
                         {{ subform.instance.cost_price.errors|join:" " }}
                       </div>
                     {% endif %}
-                  </td>
                   <td>
-                    <small>{{ subform.instance.cost_price_usd }}</small>
+                    <small>$&nbsp;&nbsp;&nbsp{{ subform.instance.cost_price_usd }}</small>
                     {% if subform.instance.cost_price_usd.errors %}
                       <div class="invalid-feedback d-block">
                         {{ subform.instance.cost_price_usd.errors|join:" " }}
@@ -193,7 +200,7 @@
                     {% endif %}
                   </td>
                   <td>
-                    <small>{{ subform.instance.sale_price }}</small>
+                    <small>$&nbsp;&nbsp;&nbsp{{ subform.instance.sale_price }}</small>
                     {% if subform.instance.sale_price.errors %}
                       <div class="invalid-feedback d-block">
                         {{ subform.instance.sale_price.errors|join:" " }}
@@ -224,10 +231,10 @@
                   </td>
                   <td>
                     {% if subform.instance.pk %}
-                    {{ subform.DELETE }} <small>Excluir</small>
+                    {{ subform.DELETE }} <small>Delete</small>
                     {% else %}
                     <button type="button" class="btn btn-sm btn-danger remove-row">
-                      Remover
+                      Remove
                     </button>
                     {% endif %}
                   </td>
@@ -238,7 +245,7 @@
           </div>
           <div class="card-footer bg-white border-0">
             <button type="button" id="add-item" class="btn btn-primary">
-              Adicionar Item
+              Add Item
             </button>
           </div>
         </div> 
@@ -272,7 +279,7 @@
   {% csrf_token %}
   <input type="hidden" name="customer" id="import-customer">
   <input type="hidden" name="exporter" id="import-exporter">
-  <input type="hidden" name="company"  id="import-company">
+  <input type="hidden" name="company" id="import-company">
 </form>
 
 {# ——— Template oculto para clonagem ——— #}
@@ -283,16 +290,28 @@
         {{ hidden }}
       {% endfor %}
       <td>{{ items_formset.empty_form.item }}</td>
-      <td><small>{{ items_formset.empty_form.cost_price|default:"0.00" }}</small></td>
-      <td><small>{{ items_formset.empty_form.cost_price_usd|default:"0.00" }}</small></td>
+      <td>
+        <small>
+          {{ items_formset.empty_form.cost_price|default:"0.00" }}
+        </small>
+      </td>
+      <td>
+        <small>
+          $&nbsp;&nbsp;&nbsp{{ items_formset.empty_form.cost_price_usd|default:"0.00" }}
+        </small>
+      </td>
       <td>{{ items_formset.empty_form.margin }}</td>
-      <td><small>{{ items_formset.empty_form.sale_price|default:"0.00" }}</small></td>
+      <td>
+        <small>
+          $&nbsp;&nbsp;&nbsp{{ items_formset.empty_form.sale_price|default:"0.00" }}
+        </small>
+      </td>
       <td>{{ items_formset.empty_form.quantity }}</td>
       <td>&mdash;</td>
       <td>&mdash;</td>
       <td>
         <button type="button" class="btn btn-sm btn-danger remove-row">
-          Remover
+          Remove
         </button>
       </td>
     </tr>

@@ -1,0 +1,37 @@
+{# apps/finance/templates/finance/proforma_invoice_form.html #}
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+  <div class="container mt-4">
+    <h2>Gerar Proforma Invoice para Order #{{ view.order.pk }}</h2>
+
+    <form 
+      method="post" 
+      action="{% url 'finance:proforma-create' view.order.pk %}"
+      novalidate
+    >
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      {% for field in form %}
+        <div class="mb-3">
+          {{ field|as_crispy_field }}
+          {% if field.errors %}
+            <div class="text-danger small">{{ field.errors }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <div class="text-end">
+        <button type="submit" class="btn btn-primary">
+          Gerar Proforma Invoice
+        </button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

@@ -567,76 +567,70 @@ class OrderBatchListView(ListView):
         ctx['order'] = get_object_or_404(Order, pk=self.kwargs['order_pk'])
         return ctx
 
-BatchItemFormSet = inlineformset_factory(
-    OrderBatch,
-    BatchItem,
-    form=BatchItemForm,
-    formset=BaseBatchItemFormSet,
-    extra=1,
-    can_delete=True
-)
 
-# formset para etapas
-StageFormSet = inlineformset_factory(
-    OrderBatch,
-    BatchStage,
-    form=BatchStageForm,
-    extra=0,
-    can_delete=False
-)
 class OrderBatchCreateView(View):
     template_name = 'orders/batch_create.html'
+    ItemFS = inlineformset_factory(
+        OrderBatch, BatchItem,
+        form=BatchItemForm,
+        formset=BaseBatchItemFormSet,
+        extra=1, can_delete=True
+    )
 
     def dispatch(self, request, *args, **kwargs):
         self.order = get_object_or_404(Order, pk=kwargs['order_pk'])
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
-        batch_form = OrderBatchForm(initial={'order': self.order})
         form = OrderBatchForm(initial={'order': self.order})
-        batch_form.fields['order'].widget = HiddenInput()
+        form.fields['order'].widget = HiddenInput()
 
-        items_fs = BatchItemFormSet(instance=OrderBatch(order=self.order))
-        # restringe queryset de order_item
+        # instância nova, mas já “ligada” à ordem
+        items_fs = self.ItemFS(instance=OrderBatch(order=self.order))
+
         allowed = self.order.order_items.all()
         for f in items_fs.forms:
             f.fields['order_item'].queryset = allowed
+        items_fs.empty_form.fields['order_item'].queryset = allowed
 
         return render(request, self.template_name, {
-            'order':      self.order,
-            'batch_form': batch_form,
             'form': form,
-            'items_fs':   items_fs,
+            'items_fs': items_fs,
+            'order': self.order,
         })
 
     def post(self, request, *args, **kwargs):
-        batch_form = OrderBatchForm(request.POST)
-        batch_form.fields['order'].widget = HiddenInput()
+        form = OrderBatchForm(request.POST)
+        form.fields['order'].widget = HiddenInput()
 
-        items_fs = BatchItemFormSet(request.POST, instance=OrderBatch(order=self.order))
+        items_fs = self.ItemFS(
+            request.POST,
+            instance=OrderBatch(order=self.order)
+        )
+
         allowed = self.order.order_items.all()
         for f in items_fs.forms:
             f.fields['order_item'].queryset = allowed
+        items_fs.empty_form.fields['order_item'].queryset = allowed
 
-        if batch_form.is_valid() and items_fs.is_valid():
-            batch = batch_form.save(commit=False)
+        if form.is_valid() and items_fs.is_valid():
+            batch = form.save(commit=False)
             batch.order = self.order
             batch.save()
             items_fs.instance = batch
             items_fs.save()
-
-            # cria todas as etapas cadastradas como BatchStage (ativas por default)
-            for stage in Stage.objects.all().order_by('name'):
-                BatchStage.objects.create(batch=batch, stage=stage, active=True)
-
+            for stage_obj in Stage.objects.all().order_by('name'):
+                BatchStage.objects.create(batch=batch, stage=stage_obj)
             return redirect('orders:batch-detail',
                             order_pk=self.order.pk, pk=batch.pk)
 
         return render(request, self.template_name, {
-            'order':      self.order,
-            'batch_form': batch_form,
-            'items_fs':   items_fs,
+            'form': form,
+            'items_fs': items_fs,
+            'order': self.order,
         })
+
+
 
 
 class OrderBatchDetailView(View):
@@ -651,31 +645,70 @@ class OrderBatchDetailView(View):
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
-        batch_form  = OrderBatchForm(instance=self.batch)
-        items_fs = BatchItemFormSet(instance=self.batch, prefix='items')
-        stages_fs = StageFormSet(instance=self.batch)
-
-        return render(request, self.template_name, {
-            'batch': self.batch,
-            'batch_form': batch_form,
-            'items_fs': items_fs,
-            'stages_fs': stages_fs,
-        })
+        return render(request, self.template_name, self._build_context())
 
     def post(self, request, *args, **kwargs):
-        batch_form = OrderBatchForm(request.POST, instance=self.batch)
-        items_fs = BatchItemFormSet(request.POST, instance=self.batch)
-        stages_fs = StageFormSet(request.POST, instance=self.batch)
+        ctx = self._build_context()
+        form = OrderBatchForm(request.POST, instance=self.batch)
 
-        if batch_form.is_valid() and items_fs.is_valid() and stages_fs.is_valid():
-            batch_form.save()
-            items_fs.save()
-            stages_fs.save()
-            return redirect('orders:order-edit', self.batch.order.pk)
+        if not form.is_valid():
+            print('invalid')
+            ctx['form'] = form
+            return render(request, self.template_name, ctx)
 
-        return render(request, self.template_name, {
+        for idx, stage in enumerate(Stage.objects.all().order_by('name')):
+            prefix = f'stages-{idx}'
+            active = request.POST.get(f'{prefix}-active') == 'on'
+            stage_id = request.POST.get(f'{prefix}-id')
+            est = request.POST.get(f'{prefix}-estimated') or None
+            act = request.POST.get(f'{prefix}-actual') or None
+            print(stage_id)
+            if active and stage_id:
+                st = BatchStage.objects.get(stage_id=stage_id, batch=self.batch)
+                st.estimated_completion = est
+                st.actual_completion = act
+                print('update stage')
+                st.save()
+            elif active and not stage_id:
+                print('creating stage')
+                BatchStage.objects.create(
+                    batch=self.batch,
+                    stage=stage,
+                    estimated_completion=est,
+                    actual_completion=act
+                )
+            elif not active and stage_id:
+                print('removing stage')
+                BatchStage.objects.filter(pk=stage_id, batch=self.batch).delete()
+
+        form.save()
+        return redirect('orders:order-edit', self.batch.order.pk)
+
+    def _build_context(self):
+        # dados principais
+        form = OrderBatchForm(instance=self.batch)
+        items_fs = BatchItemFormSet(instance=self.batch)
+
+        # prepara o dicionário das etapas já salvas
+        existing = {bs.stage.name: bs for bs in self.batch.stages.all()}
+
+        # constrói um list de dicts para template
+        stage_rows = []
+        for idx, stage_obj in enumerate(Stage.objects.all().order_by('name')):
+            bs = existing.get(stage_obj.name)
+            stage_rows.append({
+                'idx': idx,
+                'stage_id': stage_obj.pk,
+                'name': stage_obj.name,
+                'id': getattr(bs, 'pk', ''),
+                'estimated': getattr(bs, 'estimated_completion', ''),
+                'actual': getattr(bs, 'actual_completion', ''),
+                'active': bool(bs),
+            })
+
+        return {
             'batch': self.batch,
-            'batch_form': batch_form,
+            'form': form,
             'items_fs': items_fs,
-            'stages_fs': stages_fs,
-        })
+            'stage_rows': stage_rows,
+        }

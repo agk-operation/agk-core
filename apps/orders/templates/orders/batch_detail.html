@@ -1,175 +1,157 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Lote {{ batch.batch_code }}{% endblock %}
+{% block title %}Detalhe do Lote {{ batch.batch_code }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <h3 class="display-6">Lote {{ batch.batch_code }}</h3>
-  <div class="card">
-    <div class="card-body">
-      <form method="post" novalidate>
-        {% csrf_token %}
+<div class="container py-5">
 
-        <!-- Dados do Lote -->
-        <div class="card mb-4">
-          <div class="card-header fw-bold">Dados do Lote</div>
-          <div class="card-body">
-            {{ form.as_p }}
-          </div>
-        </div>
+  <h2 class="mb-4 text-muted">Lote {{ batch.batch_code }}</h2>
 
-        <!-- Etapas do Lote -->
-        <div class="card mb-4">
-          <div class="card-header fw-bold">Etapas do Lote</div>
-            <div class="card-body p-0">
-              <table class="table mb-0 table-fixed">
-                <colgroup>
-                  <!-- 1ª coluna = Nome da etapa -->
-                  <col style="width: 200px;">
-                  <!-- 2ª coluna = Estimado -->
-                  <col style="width: 120px;">
-                  <!-- 3ª coluna = Efetivo -->
-                  <col style="width: 120px;">
-                   <!-- 4ª coluna = Ações -->
-                  <col style="width: 60px;">
-                </colgroup>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ batch_form.as_p }}
+
+    <!-- Accordion de Itens do Lote (mesmo markup do create) -->
+    <div class="accordion mb-4" id="accordionItems">
+      <div class="accordion-item shadow-sm rounded">
+        <h2 class="accordion-header" id="headingItems">
+          <button class="accordion-button collapsed bg-light"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#collapseItems"
+                  aria-expanded="false"
+                  aria-controls="collapseItems">
+            Itens do Lote
+          </button>
+        </h2>
+        <div id="collapseItems"
+          class="accordion-collapse collapse"
+          aria-labelledby="headingItems"
+          data-bs-parent="#accordionItems">
+          <div class="accordion-body p-0">
+
+            {% if items_fs.non_form_errors %}
+              <div class="alert alert-danger m-3">
+                {{ items_fs.non_form_errors|join:" " }}
+              </div>
+            {% endif %}
+
+            <div class="table-responsive">
+              {{ items_fs.management_form }}
+              <table class="table table-striped table-sm mb-0">
                 <thead class="table-light">
                   <tr>
-                    <th class="stage-name-col">Etapa</th>
-                    <th>Estimado</th>
-                    <th>Efetivo</th>
-                    <th style="width:4rem">Ações</th>
+                    <th>Item</th>
+                    <th>Quantidade</th>
+                    <th class="text-end">Ações</th>
                   </tr>
                 </thead>
-                <tbody id="stages-grid">
-                  {% for row in stage_rows %}
-                  <tr class="stage-row align-middle" data-idx="{{ row.idx }}">
-                    <td>{{ row.name }}</td>
-                    <td>
-                      <input
-                        type="date"
-                        name="stages-{{ row.idx }}-estimated"
-                        class="form-control form-control-sm"
-                        value="{{ row.estimated }}"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="date"
-                        name="stages-{{ row.idx }}-actual"
-                        class="form-control form-control-sm"
-                        value="{{ row.actual }}"
-                      />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-danger remove-row-stage"
-                        title="Desmarcar etapa"
-                      ><i class="bi bi-trash"></i></button>
-                      <input 
-                        type="hidden"
-                        name="stages-{{ row.idx }}-active"
-                        value="{% if row.active %}on{% endif %}"
-                      />
-                      <input
-                        type="hidden"
-                        name="stages-{{ row.idx }}-id"
-                        value="{{ row.id }}"
-                      />
+                <tbody id="items-grid">
+                  {# — suas linhas atuais — #}
+                  {% for subform in items_fs.forms %}
+                  <tr class="item-row align-middle">
+                    {% for hidden in subform.hidden_fields %}{{ hidden }}{% endfor %}
+                    <td>{{ subform.order_item }}</td>
+                    <td>{{ subform.quantity }}</td>
+                    <td class="text-end">
+                      {% if subform.instance.pk %}
+                        {{ subform.DELETE }} <small>Excluir</small>
+                      {% else %}
+                        <button type="button" class="btn btn-sm btn-danger remove-row">
+                          Remover
+                        </button>
+                      {% endif %}
                     </td>
                   </tr>
                   {% endfor %}
+
+                  {# — template row — #}
+                  <tr id="empty-form-template" class="item-row align-middle d-none">
+                    {% for hidden in items_fs.empty_form.hidden_fields %}
+                      {{ hidden }}
+                    {% endfor %}
+                    <td>{{ items_fs.empty_form.order_item }}</td>
+                    <td>{{ items_fs.empty_form.quantity }}</td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-danger remove-row">
+                        Remover
+                      </button>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
+          </div>
+          <div class="card-footer bg-white text-start border-top-0 py-1 pe-4 rounded-bottom">
+            <button
+              type="button"
+              id="add-item"
+              class="btn btn-primary btn-sm ms-3 my-2"
+            >
+              <i class="bi bi-plus-lg "></i> Add Item
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
 
-        <!-- Bucket de etapas desativadas -->
-         <div class="card mb-4">
-          <div class="card-header fw-bold">Etapas Desativadas</div>
-            <div class="card-body">
-              <div id="removed-stages" class="d-flex flex-wrap gap-2">
-                {# badges serão renderizadas aqui pelo JS #}
+    <!-- Accordion de Etapas (mantém seu código atual) -->
+    <div class="accordion" id="accordionStages">
+      {{ stages_fs.management_form }}
+      {% for f in stages_fs.forms %}
+      <div class="accordion-item shadow-sm rounded mb-2">
+        <h2 class="accordion-header" id="headingStage{{ forloop.counter }}">
+          <button
+            class="accordion-button collapsed bg-light d-flex align-items-center"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#collapseStage{{ forloop.counter }}"
+            aria-expanded="false"
+            aria-controls="collapseStage{{ forloop.counter }}">
+            
+            {{ f.stage }}  {# hidden input #}
+            
+            <span class="fw-semibold flex-grow-1">
+              {{ f.instance.stage.name }}
+            </span>
+
+            <div class="form-check form-switch mb-0 me-4">
+              {{ f.active }}
+              <label class="form-check-label"></label>
+            </div>
+          </button>
+        </h2>
+        <div id="collapseStage{{ forloop.counter }}"
+             class="accordion-collapse collapse"
+             aria-labelledby="headingStage{{ forloop.counter }}"
+             data-bs-parent="#accordionStages">
+          <div class="accordion-body">
+            <div class="row g-3">
+              <div class="col-6 form-floating">
+                {{ f.estimated_completion }}
+                <label for="{{ f.estimated_completion.id_for_label }}">Previsto</label>
+              </div>
+              <div class="col-6 form-floating">
+                {{ f.actual_completion }}
+                <label for="{{ f.actual_completion.id_for_label }}">Real</label>
               </div>
             </div>
           </div>
         </div>
-
-
-        <!-- Itens do Lote -->
-        <div class="card mb-4">
-          <div class="card-header fw-bold">Itens do Lote</div>
-          <div class="card-body p-0">
-            {{ items_fs.management_form }}
-            {% if items_fs.non_form_errors %}
-            <div class="alert alert-danger mb-3">
-              {% for err in items_fs.non_form_errors %}{{ err }}<br>{% endfor %}
-            </div>
-            {% endif %}
-            <table class="table mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Item</th>
-                  <th>Qtd. Original</th>
-                  <th>Qtd. no Lote</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody id="batch-items-grid">
-                {% for f in items_fs.forms %}
-                <tr class="item-row align-middle">
-                  {% for h in f.hidden_fields %}{{ h }}{% endfor %}
-                  <td>{{ f.order_item }}</td>
-                  <td>{% if f.instance.pk %}{{ f.instance.order_item.quantity }}{% else %}&mdash;{% endif %}</td>
-                  <td>
-                    {{ f.quantity }}
-                    {% if f.quantity.errors %}
-                    <div class="invalid-feedback d-block">{{ f.quantity.errors|join:" " }}</div>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if f.instance.pk %}
-                    {{ f.DELETE }} <small>Excluir</small>
-                    {% else %}
-                    <button type="button" class="btn btn-sm btn-danger remove-row">Remover</button>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          <div class="card-footer bg-white border-0">
-            <button type="button" id="add-batch-item" class="btn btn-primary">Adicionar Item</button>
-          </div>
-        </div>
-
-        <div class="text-end mb-5">
-          <button type="submit" class="btn btn-success">Salvar Todas Alterações</button>
-          <a href="{% url 'orders:order-edit' batch.order.pk %}" class="btn btn-secondary ms-2">Voltar Pedido</a>
-        </div>
-      </form>
+      </div>
+      {% endfor %}
     </div>
-  </div>
-</div>
 
-<!-- Templates ocultos -->
-<table class="d-none">
-  <tbody>
-    <tr id="empty-batch-item-template" class="item-row align-middle">
-      {% for h in items_fs.empty_form.hidden_fields %}{{ h }}{% endfor %}
-      <td>{{ items_fs.empty_form.order_item }}</td>
-      <td>{{ items_fs.empty_form.quantity }}</td>
-      <td><button type="button" class="btn btn-sm btn-danger remove-row">Remover</button></td>
-    </tr>
-  </tbody>
-</table>
+    <div class="d-flex justify-content-end mt-4">
+      <button type="submit" class="btn btn-success me-2">Salvar</button>
+      <a href="{% url 'orders:order-edit' batch.order.pk %}"
+         class="btn btn-outline-secondary">Voltar</a>
+    </div>
+  </form>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="{% static 'js/batch_formsets.js' %}"></script>
-<script src="{% static 'js/batch_stage_formset.js' %}"></script>
 {% endblock %}
-

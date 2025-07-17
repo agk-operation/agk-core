@@ -277,18 +277,26 @@ class OrderItemsImportForm(forms.Form):
 
 
 class BatchStageForm(forms.ModelForm):
+    active = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        label="Ativo"
+    )
+
     class Meta:
         model = BatchStage
-        fields = ['name', 'estimated_completion', 'actual_completion']
+        # note que 'stage' vem como HiddenInput, pois não deve ser alterado
+        fields = ['stage', 'active', 'estimated_completion', 'actual_completion']
         widgets = {
-            'name': forms.TextInput(attrs={'class':'form-control'}),
+            'stage': forms.HiddenInput(),
             'estimated_completion': forms.DateInput(
-                attrs={'type':'date','class':'form-control'}
+                attrs={'type': 'date', 'class': 'form-control'}
             ),
             'actual_completion': forms.DateInput(
-                attrs={'type':'date','class':'form-control'}
+                attrs={'type': 'date', 'class': 'form-control'}
             ),
         }
+
 
 BatchStageFormSet = inlineformset_factory(
     OrderBatch, BatchStage,

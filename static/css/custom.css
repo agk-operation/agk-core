@@ -52,10 +52,19 @@
   width: 100%;
 }
 
-/* Coluna de nome de etapa: largura fixa + elipse */
-.stage-name-col {
-  width: 30%;               /* ajuste a % que fizer sentido */
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+/* oculta o ::after nativo do Bootstrap */
+  .accordion-button.stage-header::after {
+    display: none;
+  }
+  /* garante espaço adequado dentro do botão */
+  .accordion-button.stage-header {
+    padding-right: 2.5rem;
+  }
+  /* opcional: pequeno gap interno */
+  .stage-controls > .form-check {
+    margin-right: .5rem;
+  }
+
+  #batch-items-grid tr + tr {
+  border-top: 1px solid #e9ecef; /* linha sutil de separação */
 }

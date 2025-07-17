@@ -8,7 +8,7 @@ from apps.inventory.models import Item
 
 
 class Order(models.Model):
-    customer  = models.ForeignKey(Customer, on_delete=models.PROTECT)
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     exporter = models.ForeignKey(Exporter, on_delete=models.PROTECT)
     company = models.ForeignKey(Company, on_delete=models.PROTECT)
     validity = models.DateTimeField(null=False, blank=False)
@@ -55,6 +55,10 @@ class Order(models.Model):
     order_type = models.ForeignKey(
         OrderType, 
         on_delete=models.PROTECT,
+    )
+    is_locked = models.BooleanField(
+        default=False, 
+        help_text="No changes allowed when true"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -148,6 +152,10 @@ class OrderItem(models.Model):
 
         super().save(*args, **kwargs)
 
+    @property
+    def total(self):
+        return self.sale_price * self.quantity
+
     def __str__(self):
         return f"{self.item.name} ({self.remaining_qty})"
     
@@ -180,7 +188,22 @@ class BatchItem(models.Model):
 
     def __str__(self):
         return f"{self.order_item.item.name} ({self.quantity})"
-    
+ 
+
+class Stage(models.Model):
+    name = models.CharField("Etapa", max_length=100)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Stage"
+        verbose_name_plural = "Stages"
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name}"
+       
 
 class BatchStage(models.Model):
     batch = models.ForeignKey(
@@ -188,7 +211,11 @@ class BatchStage(models.Model):
         on_delete=models.CASCADE,
         related_name='stages'
     )
-    name = models.CharField("Etapa", max_length=100)
+    stage = models.ForeignKey(
+        Stage, 
+        on_delete=models.CASCADE,
+        related_name='batch_stage',
+    )
     estimated_completion = models.DateField(
         "Estimed Date",
         null=True,
@@ -199,6 +226,7 @@ class BatchStage(models.Model):
         null=True,
         blank=True
     )
+    active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -209,4 +237,5 @@ class BatchStage(models.Model):
         ordering = ['estimated_completion']
 
     def __str__(self):
-        return f"{self.name} ({self.estimated_completion})"
+        return f"{self.stage.name} — {self.estimated_completion or 'No Date Yet'}"
+

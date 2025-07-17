@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="container mt-4">
+    <h2>Excluir Proforma Invoice #{{ pi.pk }}</h2>
+    <p>
+      Tem certeza que deseja excluir a Proforma Invoice 
+      <strong>#{{ pi.pk }}</strong> da Order 
+      <strong>#{{ pi.order.pk }}</strong>?
+    </p>
+    <p>
+      Isso <strong>apagará o arquivo PDF</strong> e 
+      <strong>destrava a ordem</strong>, permitindo edições novamente.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <a 
+        href="{% url 'finance:proforma-detail' pi.pk %}" 
+        class="btn btn-secondary"
+      >
+        Cancelar
+      </a>
+      <button type="submit" class="btn btn-danger">
+        Confirmar Exclusão
+      </button>
+    </form>
+  </div>
+{% endblock %}

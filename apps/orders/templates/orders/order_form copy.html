@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load pagination_tags %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+  {% if object %}
+    Order {{ object.pk }}
+  {% else %}
+    Add order
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="display-6">
+    {% if object %}
+      Edit Order {{ object.pk }}
+    {% else %}
+      Add Order
+    {% endif %}
+  </h3>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post" id="order-form" novalidate>
+        
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for err in form.non_field_errors %}
+              <div>{{ err }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="card mt-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Order Infos</span>
+          </div>
+          <div class="card-body p-0">
+            <div>
+              {% crispy form %}
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          {# Se já existe Proforma, mostra link para visualizar/baixar PDF #}
+          {% if object.proforma %}
+              {% if object.proforma.pdf.name %}
+                <a href="{{ object.proforma.pdf.url }}" class="btn btn-primary float-end">
+                  Download Proforma Invoice (PDF)
+                </a>
+              {% else %}
+                <div class="alert alert-warning float-end">
+                  Proforma Invoice Created. <a href="{% url 'finance:proforma-detail' object.proforma.pk %}">View</a>
+                </div>
+              {% endif %}
+          {% elif not object.is_locked %}
+            <a href="{% url 'finance:proforma-create' object.pk %}"
+              class="btn btn-secondary float-end">
+              Create Proforma Invoice
+            </a>
+          {% endif %}
+        </div>
+
+        {# ——— Bloco de Lotes (só se já existir uma ordem) ——— #}
+        {% if object %}
+        <div class="card mt-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Order Batches</span>
+            <a href="{% url 'orders:batch-add' object.pk %}" class="btn btn-sm btn-success">
+              + New Batch
+            </a>
+          </div>
+          <div class="card-body p-0">
+            {% if object.batches.exists %}
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Code</th>
+                  <th>Status</th>
+                  <th>Created at</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for batch in object.batches.all %}
+                <tr>
+                  <td>{{ batch.batch_code }}</td>
+                  <td>{{ batch.get_status_display }}</td>
+                  <td>{{ batch.created_at|date:"d/m/Y H:i" }}</td>
+                  <td>
+                    <a href="{% url 'orders:order-batch-list' object.pk %}"
+                       class="btn btn-sm btn-outline-primary">
+                      View Batches
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info mb-0">No Batch Created.</div>
+            {% endif %}
+          </div>
+          <div class="card-footer border-0 bg-white">
+             <!-- botões, legendas, etc -->
+          </div>
+        </div>
+        {% endif %}
+
+        {# ——— Bloco de Itens da Ordem ——— #}
+        {{ items_formset.management_form }}
+        <input type="hidden" name="page" value="{{ items_page.number }}">
+
+        {# Exibe erros não-field do formset #}
+        {% if messages %}
+          <div class="container mt-2">
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="card mt-4">
+          <div class="card-header fw-bold d-flex align-items-center">
+            Order Items
+            <div class="ms-auto d-flex gap-2">
+              {% if object %}
+                <button
+                  id="btn-update-margins"
+                  type="button"
+                  class="btn btn-warning btn-sm"
+                  data-update-url="{% url 'orders:order-update-margins' object.pk %}"
+                >
+                  <i class="bi bi-arrow-clockwise"></i> Update Margins
+                </button>
+                <button
+                  id="btn-import-items"
+                  type="button"
+                  class="btn btn-outline-primary btn-sm"
+                  data-url="{% url 'orders:order-item-import' object.pk %}"
+                >
+                  <i class="bi bi-upload"></i> Import Items
+                </button>
+              {% else %}
+                <button
+                  type="button"
+                  id="btn-import-items-new"
+                  class="btn btn-outline-primary float-end"
+                  data-url="{% url 'orders:order-item-import-new' %}"
+                >
+                  <i class="bi bi-upload"></i> Import Items
+                </button>
+              {% endif %}
+          </div>
+          </div>
+          <div class="card-body p-0">
+            {% if items_formset.non_form_errors %}
+            <div class="alert alert-danger">
+              {% for err in items_formset.non_form_errors %}
+                <div>{{ err }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+            <table class="table mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th>Cost Price</th>
+                  <th>Cost Price USD</th>
+                  <th>Margin (%)</th>
+                  <th>Sale Price</th>
+                  <th>Quantity</th>
+                  <th>Original</th>
+                  <th>Balance</th>
+                  {% if not object.is_locked %}
+                    <th>Actions</th>
+                  {% endif %}
+                </tr>
+              </thead>
+              <tbody id="items-grid">
+                {% for subform in items_formset %}
+                <tr class="item-row align-middle">
+                  {# hidden: id, ORDER, DELETE #}
+                  {% for hidden in subform.hidden_fields %}
+                    {{ hidden }}
+                  {% endfor %}
+                  <td>
+                    {{ subform.item }}
+                    {% if subform.item.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ subform.item.errors|join:" " }}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <small>{{ subform.instance.cost_price }}</small>
+                    {% if subform.instance.cost_price.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ subform.instance.cost_price.errors|join:" " }}
+                      </div>
+                    {% endif %}
+                  <td>
+                    <small>$&nbsp;&nbsp;&nbsp{{ subform.instance.cost_price_usd }}</small>
+                    {% if subform.instance.cost_price_usd.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ subform.instance.cost_price_usd.errors|join:" " }}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {{ subform.margin }}
+                    {% if subform.margin.errors %}
+                      <div class="text-danger">
+                        {{ subform.margin.errors }}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <small>$&nbsp;&nbsp;&nbsp{{ subform.instance.sale_price }}</small>
+                    {% if subform.instance.sale_price.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ subform.instance.sale_price.errors|join:" " }}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {{ subform.quantity }}
+                    {% if subform.quantity.errors %}
+                    <div class="invalid-feedback d-block">
+                      {{ subform.quantity.errors|join:" " }}
+                    </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if subform.instance.pk %}
+                      <small>{{ subform.instance.quantity }}</small>
+                    {% else %}
+                      &mdash;
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if subform.instance.pk %}
+                      <small>{{ subform.instance.remaining_qty }}</small>
+                    {% else %}
+                      &mdash;
+                    {% endif %}
+                  </td>
+                  {% if subform.instance.pk and not object.is_locked %}
+                    <td>
+                      {{ subform.DELETE }} <small>Delete</small>
+                  {% elif not object.is_locked %}
+                      <button type="button" class="btn btn-sm btn-danger remove-row">
+                        Remove
+                      </button>
+                    
+                    </td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if not object.is_locked %}
+            <div class="card-footer bg-white border-0">
+              <button type="button" id="add-item" class="btn btn-primary">
+                Add Item
+              </button>
+            </div>
+          {% endif %}
+        </div> 
+        <div class="mt-4">
+          {% render_pagination items_page %}
+        </div>
+        <div class="d-flex gap-2 mt-4 mb-4 ms-4">
+          <!-- Botão padrão: salva e sai -->
+          <button type="submit" name="action" value="save_exit" 
+                  class="btn btn-success"
+                  form="order-form">
+            Save
+          </button>
+
+          <!-- Novo botão: salva e continua -->
+          <button type="submit" name="action" value="save_continue" 
+                  class="btn btn-outline-primary"
+                  form="order-form">
+            Save & Continue
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+<form id="import-form" 
+      method="post" 
+      action="{% url 'orders:order-item-import-new' %}" 
+      style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="customer" id="import-customer">
+  <input type="hidden" name="exporter" id="import-exporter">
+  <input type="hidden" name="company"  id="import-company">
+</form>
+
+{# ——— Template oculto para clonagem ——— #}
+<table class="d-none">
+  <tbody>
+    <tr id="empty-form-template" class="item-row align-middle">
+      {% for hidden in items_formset.empty_form.hidden_fields %}
+        {{ hidden }}
+      {% endfor %}
+      <td>{{ items_formset.empty_form.item }}</td>
+      <td>
+        <small>{{ items_formset.empty_form.cost_price|default:"0.00" }}</small>
+      </td>
+      <td>
+        <small>
+          $&nbsp;&nbsp;&nbsp{{ items_formset.empty_form.cost_price_usd|default:"0.00" }}
+        </small>
+      </td>
+      <td>{{ items_formset.empty_form.margin }}</td>
+      <td>
+        <small>
+          $&nbsp;&nbsp;&nbsp{{ items_formset.empty_form.sale_price|default:"0.00" }}
+        </small>
+      </td>
+      <td>{{ items_formset.empty_form.quantity }}</td>
+      <td>&mdash;</td>
+      <td>&mdash;</td>
+      <td>
+        <button type="button" class="btn btn-sm btn-danger remove-row">
+          Remove
+        </button>
+      </td>
+    </tr>
+  </tbody>
+</table>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'js/order_formsets.js' %}"></script>
+  <script src="{% static 'js/import_order_itens.js' %}"></script>
+{% endblock %}

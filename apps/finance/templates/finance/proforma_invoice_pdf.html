@@ -1,0 +1,143 @@
+{# apps/finance/templates/finance/proforma_invoice_pdf.html #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap');
+    body {
+      font-family: 'Montserrat', sans-serif;
+      color: #333333;
+      margin: 0;
+      padding: 20px;
+      background: #ffffff;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .header .title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #6f42c1;
+    }
+    .header .date {
+      font-size: 10px;
+      color: #777777;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    .summary .box {
+      background: #F8F0FC;
+      padding: 8px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .summary .box .heading {
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #6f42c1;
+    }
+    .summary .box p {
+      margin: 2px 0;
+      font-size: 10px;
+      line-height: 1.2;
+    }
+    .table-container {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+    }
+    thead th {
+      background: #6f42c1;
+      color: #ffffff;
+      padding: 6px;
+      font-size: 11px;
+      text-align: left;
+      border: 1px solid #D1C4E9;
+    }
+    tbody tr:nth-child(even) {
+      background: #F3E5F5;
+    }
+    tbody td {
+      padding: 5px;
+      font-size: 10px;
+      border-bottom: 1px solid #E1BEE7;
+    }
+    tfoot td {
+      padding: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border-top: 2px solid #D1C4E9;
+    }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">Proforma Invoice{% if pi.pk %} #{{ pi.pk }}{% endif %}</div>
+    <div class="date">Date: {{ pi.created_at|date:"F j, Y" }}</div>
+  </div>
+
+  <div class="summary">
+    <div class="box">
+      <div class="heading">Order Info</div>
+      <p><strong>Order:</strong> {{ pi.order.pk }}</p>
+      <p><strong>Customer:</strong> {{ pi.order.customer }}</p>
+    </div>
+    <div class="box">
+      <div class="heading">Shipping</div>
+      <p><strong>Loading Port:</strong> {{ pi.order.pol }}</p>
+      <p><strong>Discharge Port:</strong> {{ pi.order.pod }}</p>
+    </div>
+    <div class="box">
+      <div class="heading">Payment</div>
+      <p><strong>Terms:</strong> {{ pi.payment_terms }}</p>
+      <p><strong>Deposit:</strong> {{ pi.deposit_percentage }}%</p>
+      <p><strong>Exchange:</strong> 1 USD → {{ pi.usd_rmb }} RMB</p>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th class="text-right">Unit Price</th>
+          <th class="text-center">Quantity</th>
+          <th class="text-right">Total USD</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ it.code }}</td>
+          <td>{{ it.name }}</td>
+          <td class="text-right">{{ it.sale_price|floatformat:2 }}</td>
+          <td class="text-center">{{ it.quantity }}</td>
+          <td class="text-right">{{ it.total|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4" class="text-right">Grand Total:</td>
+          <td class="text-right">{{ total_sum|floatformat:2 }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</body>
+</html>

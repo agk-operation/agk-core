@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="d-flex justify-content-end p-1">
+  {% if object %}
+    <a href="{% url 'finance:proforma-delete' object.pk %}"
+      class="btn btn-danger btn-sm">
+      Delete Invoice
+    </a>
+  {% endif %}
+</div>
+<div class="container my-5">
+  
+  
+
+  <!-- Header Card -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2 class="card-title mb-0">Proforma Invoice{% if object %} #{{ object.pk }}{% endif %}</h2>
+          <small class="text-muted">{% if object %}Generated on {{ object.created_at|date:"F j, Y, g:i a" }}{% endif %}</small>
+        </div>
+        <div>
+          {% if object and object.pdf.name %}
+            <a href="{{ object.pdf.url }}" class="btn btn-outline-primary">
+              <i class="bi bi-download me-1"></i>Download PDF
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Info Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title ">Order Details</h5>
+          {% if object %}
+            <p class="mb-1"><strong>Order :</strong> <a href="{% url 'orders:order-edit' object.order.pk %}">#{{ object.order.pk }}</a></p>
+            <p class="mb-1"><strong>Customer:</strong> {{ object.order.customer }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-success h-100">
+        <div class="card-body">
+          <h5 class="card-title text-success">Shipping & Payment</h5>
+          <p class="mb-1"><strong>Port of Loading:</strong> {{ object.order.pol }}</p>
+          <p class="mb-1"><strong>Port of Discharge:</strong> {{ object.order.pod }}</p>
+          <p class="mb-1"><strong>Payment Terms:</strong> {{ object.payment_terms }}</p>
+          <p class="mb-1"><strong>Deposit:</strong> {{ object.deposit_percentage }}%</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-warning h-100">
+        <div class="card-body">
+          <h5 class="card-title text-warning">Exchange Rate</h5>
+          <p class="h5 mb-0">1 USD → {{ object.usd_rmb }} RMB</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Items Table -->
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h4 class="mb-0">Order Items</h4>
+      {% if not object.pdf.name %}
+        <span class="badge bg-danger">PDF not generated</span>
+      {% endif %}
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">Code</th>
+              <th scope="col">Name</th>
+              <th scope="col" class="text-end">Unit Price (USD)</th>
+              <th scope="col" class="text-center">Quantity</th>
+              <th scope="col" class="text-end">Total (USD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in order_items %}
+              <tr>
+                <td>{{ it.item.s_code }}</td>
+                <td>{{ it.item.name }}</td>
+                <td class="text-end">{{ it.sale_price|floatformat:2 }}</td>
+                <td class="text-center">{{ it.quantity }}</td>
+                <td class="text-end">{{ it.total|floatformat:2 }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-center py-4">No items found.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Back Button -->
+  {% if object %}
+    <div class="mt-4">
+      <a href="{% url 'orders:order-edit' object.order.id %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Order
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

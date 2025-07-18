@@ -14,7 +14,7 @@ from apps.inventory.models import Item
 from apps.pricing.models import CustomerItemMargin
 from apps.core.models import Company
 from .models import Order, OrderBatch, OrderItem, BatchStage, BatchItem, Stage
-from .forms import OrderItemForm, OrderItemFormSet, BatchItemFormSet, OrderForm, BaseBatchItemFormSet, OrderBatchForm, OrderItemsImportForm, BatchStageForm, BatchItemForm
+from .forms import OrderItemForm, BatchItemFormSet, OrderForm, OrderBatchForm, OrderItemsImportForm, BatchStageFormSet
 from agk_core import metrics
 # —— ORDERS ——
 class OrderListView(ListView):  
@@ -266,7 +266,7 @@ class OrderCreateView(CreateView):
     FORMSET_PREFIX  = 'orderitems'
 
     def get_initial(self):
-        initial    = super().get_initial()
+        initial = super().get_initial()
         order_data = self.request.session.pop(self.sess_data_key, None)
         if order_data:
             initial.update(order_data)
@@ -567,23 +567,7 @@ class OrderBatchListView(ListView):
         ctx['order'] = get_object_or_404(Order, pk=self.kwargs['order_pk'])
         return ctx
 
-BatchItemFormSet = inlineformset_factory(
-    OrderBatch,
-    BatchItem,
-    form=BatchItemForm,
-    formset=BaseBatchItemFormSet,
-    extra=1,
-    can_delete=True
-)
 
-# formset para etapas
-StageFormSet = inlineformset_factory(
-    OrderBatch,
-    BatchStage,
-    form=BatchStageForm,
-    extra=0,
-    can_delete=False
-)
 class OrderBatchCreateView(View):
     template_name = 'orders/batch_create.html'
 
@@ -603,7 +587,7 @@ class OrderBatchCreateView(View):
             f.fields['order_item'].queryset = allowed
 
         return render(request, self.template_name, {
-            'order':      self.order,
+            'order': self.order,
             'batch_form': batch_form,
             'form': form,
             'items_fs':   items_fs,
@@ -648,34 +632,49 @@ class OrderBatchDetailView(View):
             pk=kwargs['pk'],
             order_id=kwargs['order_pk']
         )
+        self.order = get_object_or_404(Order, pk=kwargs['order_pk'])
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
-        batch_form  = OrderBatchForm(instance=self.batch)
-        items_fs = BatchItemFormSet(instance=self.batch, prefix='items')
-        stages_fs = StageFormSet(instance=self.batch)
+        items_fs = BatchItemFormSet(
+            instance=self.batch, 
+            prefix='batch_item', 
+            initial=[{'order': self.batch.order}]
+        )
+        # restringe queryset de order_item
+        allowed = self.order.order_items.all()
+        for f in items_fs.forms:
+            f.fields['order_item'].queryset = allowed
+
 
         return render(request, self.template_name, {
-            'batch': self.batch,
-            'batch_form': batch_form,
+            'batch_form': OrderBatchForm(instance=self.batch),
             'items_fs': items_fs,
-            'stages_fs': stages_fs,
-        })
+            'stages_fs': BatchStageFormSet(instance=self.batch, prefix='batch_stages'),
+            'batch': self.batch,
+            }
+        )
 
     def post(self, request, *args, **kwargs):
         batch_form = OrderBatchForm(request.POST, instance=self.batch)
-        items_fs = BatchItemFormSet(request.POST, instance=self.batch)
-        stages_fs = StageFormSet(request.POST, instance=self.batch)
-
+        items_fs = BatchItemFormSet(request.POST, instance=self.batch, prefix='batch_item')
+        stages_fs = BatchStageFormSet(request.POST, instance=self.batch, prefix='batch_stages')
+        print(items_fs)
         if batch_form.is_valid() and items_fs.is_valid() and stages_fs.is_valid():
-            batch_form.save()
-            items_fs.save()
-            stages_fs.save()
-            return redirect('orders:order-edit', self.batch.order.pk)
+            batch_form.save()       # salva campos do batch
+            items_fs.save()         # cria/atualiza/deleta itens automaticamente
+            stages_fs.save()        # salva os estágios
+            
+            return redirect(
+                'orders:order-batch-detail',
+                order_pk=self.batch.order.pk,
+                pk=self.batch.pk
+            )
 
         return render(request, self.template_name, {
-            'batch': self.batch,
             'batch_form': batch_form,
             'items_fs': items_fs,
             'stages_fs': stages_fs,
-        })
+            'batch': self.batch,
+            }
+        )

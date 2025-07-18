@@ -1,41 +1,46 @@
-document.addEventListener('DOMContentLoaded', function() {
-  // Onde estão as linhas do formset
-  const itemsGrid      = document.getElementById('items-grid');
-  // A linha oculta que usamos como template
-  const emptyRow       = document.getElementById('empty-form-template');
-  // O input de TOTAL_FORMS do management_form
-  const totalFormsInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
-  // Automaticamente descobre o prefixo (ex: "items")
-  const prefix         = totalFormsInput.name.replace('-TOTAL_FORMS', '');
+document.addEventListener('DOMContentLoaded', () => {
+  const prefix = 'batch_item';
+  const form = document.querySelector('form');
+  const totalForms = document.querySelector(`[name="${prefix}-TOTAL_FORMS"]`);
+  const grid = document.getElementById('items-grid');
+  const template = document.getElementById('empty-form-template');
+  const addBtn = document.getElementById('add-item');
 
-  // Ao clicar em “Add Item”
-  document.getElementById('add-item').addEventListener('click', function() {
-    const formCount = parseInt(totalFormsInput.value, 10);
-    // Clona a linha-OCULTA
-    const newRow = emptyRow.cloneNode(true);
+  function reindex() {
+    const rows = Array.from(grid.querySelectorAll('tr.item-row:not(.d-none)'));
+    rows.forEach((row, i) => {
+      row.querySelectorAll('input, select, textarea, label').forEach(el => {
+        if (el.name) el.name = el.name.replace(/batch_item-\d+-/, `batch_item-${i}-`);
+        if (el.id)   el.id   = el.id.replace(/id_batch_item-\d+-/, `id_batch_item-${i}-`);
+        if (el.htmlFor) el.htmlFor = el.htmlFor.replace(/id_batch_item-\d+-/, `id_batch_item-${i}-`);
+      });
+    });
+    totalForms.value = rows.length;
+  }
 
-    // Remove o id e a classe de oculto
+  addBtn.addEventListener('click', () => {
+    const index = parseInt(totalForms.value, 10);
+    const newRow = template.cloneNode(true);
     newRow.removeAttribute('id');
     newRow.classList.remove('d-none');
-
-    // Substitui todos os __prefix__ pelo índice atual
-    newRow.innerHTML = newRow.innerHTML.replace(/__prefix__/g, formCount);
-
-    // Anexa no final da tabela
-    itemsGrid.appendChild(newRow);
-
-    // Atualiza o TOTAL_FORMS
-    totalFormsInput.value = formCount + 1;
+    newRow.innerHTML = newRow.innerHTML
+      .replace(/batch_item-__prefix__/g, `batch_item-${index}`)
+      .replace(/id_batch_item-__prefix__/g, `id_batch_item-${index}`);
+    grid.appendChild(newRow);
+    reindex();
   });
 
-  // Delegate para o botão “Remover” nas linhas novas
-  itemsGrid.addEventListener('click', function(e) {
+  grid.addEventListener('click', e => {
     if (e.target.matches('.remove-row')) {
-      const row = e.target.closest('tr');
-      row.remove();
-      // Reconta apenas as linhas visíveis, sem o template
-      const visible = itemsGrid.querySelectorAll('tr.item-row:not(.d-none)');
-      totalFormsInput.value = visible.length;
+      e.target.closest('tr').remove();
+      reindex();
     }
   });
+
+  form.addEventListener('submit', () => {
+    const tpl = document.getElementById('empty-form-template');
+    if (tpl) tpl.remove();
+  });
+
+  reindex();
 });

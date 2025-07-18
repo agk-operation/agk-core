@@ -195,17 +195,11 @@ class BaseBatchItemFormSet(BaseInlineFormSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        order = None
-        if hasattr(self.instance, 'order') and self.instance.order_id:
-            order = self.instance.order
-        else:
-            order = kwargs.get('initial', {}).get('order')
+        order = getattr(self.instance, 'order', None)
+        if not order and 'initial' in kwargs:
+            order = kwargs['initial'].get('order')
 
-        if order:
-            allowed_qs = order.order_items.all()
-        else:
-            allowed_qs = OrderItem.objects.none()
-
+        allowed_qs = order.order_items.all() if order else OrderItem.objects.none()
         for form in self.forms:
             form.fields['order_item'].queryset = allowed_qs
 
@@ -229,16 +223,12 @@ class BaseBatchItemFormSet(BaseInlineFormSet):
 
         errors = []
         for oi, new_qty in totals.items():
-            qs = BatchItem.objects.filter(order_item=oi)
-            if self.instance.pk:
-                qs = qs.exclude(batch=self.instance)
-            already_shipped = qs.aggregate(total=Sum('quantity'))['total'] or 0
-
-            if already_shipped + new_qty > oi.quantity:
-                allowed = oi.quantity - already_shipped
+          
+            if oi.shipped_qty + new_qty > oi.remaining_qty:
+                
                 msg = (
                     f"Você está tentando embarcar {new_qty} unidades de “{oi.item.name}”, "
-                    f"mas só restam {allowed}."
+                    f"mas só restam {oi.remaining_qty}."
                 )
                 for f in forms_per_item[oi]:
                     f.add_error('quantity', msg)
@@ -252,7 +242,7 @@ BatchItemFormSet = inlineformset_factory(
     OrderBatch, BatchItem,
     form=BatchItemForm,
     formset=BaseBatchItemFormSet,
-    extra=1,
+    extra=0,
     can_delete=True
 )
 
@@ -301,6 +291,6 @@ class BatchStageForm(forms.ModelForm):
 BatchStageFormSet = inlineformset_factory(
     OrderBatch, BatchStage,
     form=BatchStageForm,
-    extra=1,
+    extra=0,
     can_delete=True
 )

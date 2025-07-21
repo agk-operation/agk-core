@@ -3,13 +3,89 @@
 
 {% block title %}Detalhe do Lote {{ batch.batch_code }}{% endblock %}
 
+
 {% block content %}
+
+
 <div class="container py-5">
-  <h2 class="mb-4 text-muted">Lote {{ batch.batch_code }}</h2>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body d-flex justify-content-between align-items-center">
+      <div>
+        <h3 class="mb-0">{% if batch %}Batch {{ batch.batch_code }}{% else %}New Batch{% endif %}</h3>
+        <small class="text-muted">{% if batch %}Generated on {{ batch.created_at|date:"F j, Y" }}{% endif %}</small>
+      </div>
+      <div class="btn-group">
+        <div class="d-flex justify-content-end p-1">
+          {% if batch %}
+            <a
+              href="{% url 'orders:batch-delete' order_pk=batch.order.pk pk=batch.pk %}"
+              class="btn btn-danger btn-sm"
+            >
+              <i class="bi bi-trash"></i> Excluir lote
+            </a>
+          {% endif %}
+        </div>
+        
+      </div>
+    </div>
+  </div> 
+
 
   <form method="post" novalidate>
-    {% csrf_token %}
-    {{ batch_form.as_p }}
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+          {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if batch %}
+    <div class="row gx-3 mb-4">
+      <div class="col-md-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h6 class="mb-3">Order Details</h6>
+            <p class="mb-2"><strong>Customer:</strong> {{ batch.order.customer }}</p>
+            <p class="mb-2"><strong>Company:</strong> {{ batch.order.company }}</p>
+            <p class="mb-2"><strong>Importer:</strong> {{ batch.order.exporter }}</p>
+            <p class="mb-2"><strong>Exporter:</strong> {{ batch.order.exporter }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h6 class="text-success mb-2">Shipping</h6>
+            <p class="mb-2"><strong>Port Loading:</strong> {{ batch.order.pol }}</p>
+            <p class="mb-2"><strong>Port Discharge:</strong> {{ batch.order.pod }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h6 class="mb-2">Payment</h6>
+            <p class="mb-2"><strong>Down Payment:</strong> {{ batch.order.down_payment|floatformat:2 }}%</p>
+            <p class="h5 mb-2">$ {{ batch_metrics.deposit_payment }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h6 class="text-success mb-2">Order Total USD</h6>
+            <p class="h5 mb-0">$ {{ batch_metrics.total_selling_price|default:"0.00" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+   {% endif %}
+   {% csrf_token %}
+   {{ batch_form.as_p }}
 
     {# — formset de Itens (prefix = batch_items) — #}
     {{ items_fs.management_form }}
@@ -79,9 +155,11 @@
                       >
                         <option value="" selected>---------</option>
                         {% for oi in batch.order.order_items.all %}
-                          <option value="{{ oi.pk }}">
-                            {{ oi.item.name }} ({{ oi.quantity }})
-                          </option>
+                          {% if not oi.remaining_qty == 0 %}
+                            <option value="{{ oi.pk }}">
+                              {{ oi.item.name }} ({{ oi.remaining_qty }})
+                            </option>
+                          {% endif %}
                         {% endfor %}
                       </select>
                     </td>
@@ -113,44 +191,62 @@
     </div>
 
     {# — formset de Etapas (prefix = batch_stages) — #}
-    {{ stages_fs.management_form }}
-    <div class="accordion" id="accordionStages">
-      {% for f in stages_fs.forms %}
-      <div class="accordion-item shadow-sm rounded mb-2">
-        <h2 class="accordion-header" id="headingStage{{ forloop.counter }}">
-          <button class="accordion-button collapsed bg-light d-flex align-items-center"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#collapseStage{{ forloop.counter }}">
-            {{ f.stage }}
-            <span class="fw-semibold flex-grow-1">
-              {{ f.instance.stage.name }}
-            </span>
-            <div class="form-check form-switch mb-0 me-4">
-              {{ f.active }}
-              <label class="form-check-label"></label>
+{{ stages_fs.management_form }}
+
+<div class="accordion" id="accordionStages">
+  {% for f in stages_fs.forms %}
+    <div class="accordion-item shadow-sm rounded mb-2">
+      {# exibe erros de formulário, se houver #}
+      {% if f.non_field_errors %}
+        <div class="alert alert-danger mb-0">
+          {{ f.non_field_errors|join:"<br>"|safe }}
+        </div>
+      {% endif %}
+
+      {% for hidden in f.hidden_fields %}
+        {{ hidden }}
+      {% endfor %}
+
+      <h2 class="accordion-header" id="headingStage{{ forloop.counter }}">
+        <button class="accordion-button collapsed bg-light d-flex align-items-center"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseStage{{ forloop.counter }}">
+          {{ f.stage }}
+          <span class="fw-semibold flex-grow-1">
+            {{ f.instance.stage.name }}
+          </span>
+          <div class="form-check form-switch mb-0 me-4">
+            {{ f.active }}<label class="form-check-label"></label>
+          </div>
+        </button>
+      </h2>
+      <div id="collapseStage{{ forloop.counter }}"
+           class="accordion-collapse collapse"
+           data-bs-parent="#accordionStages">
+        <div class="accordion-body">
+          <div class="row g-3">
+            <div class="col-6 form-floating">
+              {{ f.estimated_completion }}
+              <label for="{{ f.estimated_completion.id_for_label }}">Previsto</label>
+              {% for err in f.estimated_completion.errors %}
+                <div class="text-danger small">{{ err }}</div>
+              {% endfor %}
             </div>
-          </button>
-        </h2>
-        <div id="collapseStage{{ forloop.counter }}"
-             class="accordion-collapse collapse"
-             data-bs-parent="#accordionStages">
-          <div class="accordion-body">
-            <div class="row g-3">
-              <div class="col-6 form-floating">
-                {{ f.estimated_completion }}
-                <label for="{{ f.estimated_completion.id_for_label }}">Previsto</label>
-              </div>
-              <div class="col-6 form-floating">
-                {{ f.actual_completion }}
-                <label for="{{ f.actual_completion.id_for_label }}">Real</label>
-              </div>
+            <div class="col-6 form-floating">
+              {{ f.actual_completion }}
+              <label for="{{ f.actual_completion.id_for_label }}">Real</label>
+              {% for err in f.actual_completion.errors %}
+                <div class="text-danger small">{{ err }}</div>
+              {% endfor %}
             </div>
           </div>
         </div>
       </div>
-      {% endfor %}
     </div>
+  {% endfor %}
+</div>
+
 
     <div class="d-flex justify-content-end mt-4">
       <button type="submit" class="btn btn-success me-2">Salvar</button>

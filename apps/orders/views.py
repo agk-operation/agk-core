@@ -7,7 +7,7 @@ from django.core.paginator import Paginator
 from django.contrib import messages
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
-from django.views.generic import ListView, CreateView, UpdateView, View
+from django.views.generic import ListView, CreateView, UpdateView, View, DeleteView
 from django.forms import HiddenInput, inlineformset_factory
 from django.db.models import Sum, F, DecimalField
 from apps.inventory.models import Item
@@ -579,8 +579,15 @@ class OrderBatchCreateView(View):
         batch_form = OrderBatchForm(initial={'order': self.order})
         form = OrderBatchForm(initial={'order': self.order})
         batch_form.fields['order'].widget = HiddenInput()
+        
+        extra_forms = 1
+        DynamicBatchItemFormSet = type(
+            'DynamicBatchItemFormSet',
+            (BatchItemFormSet,),
+            {'extra': extra_forms}
+        )
 
-        items_fs = BatchItemFormSet(instance=OrderBatch(order=self.order))
+        items_fs = DynamicBatchItemFormSet(instance=OrderBatch(order=self.order))
         # restringe queryset de order_item
         allowed = self.order.order_items.all()
         for f in items_fs.forms:
@@ -590,7 +597,7 @@ class OrderBatchCreateView(View):
             'order': self.order,
             'batch_form': batch_form,
             'form': form,
-            'items_fs':   items_fs,
+            'items_fs': items_fs,
         })
 
     def post(self, request, *args, **kwargs):
@@ -617,9 +624,9 @@ class OrderBatchCreateView(View):
                             order_pk=self.order.pk, pk=batch.pk)
 
         return render(request, self.template_name, {
-            'order':      self.order,
+            'order': self.order,
             'batch_form': batch_form,
-            'items_fs':   items_fs,
+            'items_fs': items_fs,
         })
 
 
@@ -652,6 +659,7 @@ class OrderBatchDetailView(View):
             'items_fs': items_fs,
             'stages_fs': BatchStageFormSet(instance=self.batch, prefix='batch_stages'),
             'batch': self.batch,
+            'batch_metrics': metrics.get_batch_metrics(self.batch.pk)
             }
         )
 
@@ -659,22 +667,54 @@ class OrderBatchDetailView(View):
         batch_form = OrderBatchForm(request.POST, instance=self.batch)
         items_fs = BatchItemFormSet(request.POST, instance=self.batch, prefix='batch_item')
         stages_fs = BatchStageFormSet(request.POST, instance=self.batch, prefix='batch_stages')
-        print(items_fs)
+        
         if batch_form.is_valid() and items_fs.is_valid() and stages_fs.is_valid():
             batch_form.save()       # salva campos do batch
             items_fs.save()         # cria/atualiza/deleta itens automaticamente
             stages_fs.save()        # salva os estágios
+            print('valid')
             
             return redirect(
-                'orders:order-batch-detail',
+                'orders:batch-detail',
                 order_pk=self.batch.order.pk,
                 pk=self.batch.pk
             )
 
+        else:
+            if not stages_fs.is_valid():
+                # erros gerais do formset
+                # erros de cada form individual
+                for idx, form in enumerate(stages_fs.forms):
+                    print(f"Form {idx} errors:", form.errors)
+
+            messages.error(request, 'Existem erros no formulário. Verifique os campos abaixo.')
+        
         return render(request, self.template_name, {
             'batch_form': batch_form,
             'items_fs': items_fs,
             'stages_fs': stages_fs,
             'batch': self.batch,
+            'batch_metrics': metrics.get_batch_metrics(self.batch.pk)
             }
         )
+
+
+class OrderBatchDeleteView(DeleteView):
+    model = OrderBatch
+    template_name = 'orders/order_batch_delete.html'
+    context_object_name = 'batch'
+
+    # 1) Garante que só vamos deletar o batch que pertence à Order correta
+    def get_queryset(self):
+        order_pk = self.kwargs['order_pk']
+        return super().get_queryset().filter(order__pk=order_pk)
+
+    # 2) Mensagem e redirecionamento dinâmico depois de excluir
+    def get_success_url(self):
+        order_pk = self.kwargs['order_pk']
+        messages.success(
+            self.request,
+            f"Batch #{self.object.pk} deletede successfully."
+        )
+        # Aqui usamos reverse, não reverse_lazy, pois é em runtime
+        return reverse('orders:order-edit', kwargs={'pk': order_pk})

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="container py-5">
+    <h1>Excluir Batch {{ batch.batch_code }}</h1>
+    <p>Tem certeza que deseja excluir este lote da Order #{{ batch.order.pk }}?</p>
+
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">
+        Sim, excluir lote
+      </button>
+      <a
+        href="{% url 'orders:batch-detail' order_pk=batch.order.pk pk=batch.pk %}"
+        class="btn btn-secondary"
+      >
+        Cancelar
+      </a>
+    </form>
+  </div>
+{% endblock %}

@@ -15,5 +15,6 @@ urlpatterns = [
     path('<int:order_pk>/batches/add/', views.OrderBatchCreateView.as_view(), name='batch-add'),
     path('<int:order_pk>/batches/', views.OrderBatchListView.as_view(), name='order-batch-list'),
     path('<int:order_pk>/batches/<int:pk>/', views.OrderBatchDetailView.as_view(), name='batch-detail'),
+    path('<int:order_pk>/batches/<int:pk>/delete', views.OrderBatchDeleteView.as_view(), name='batch-delete'),
 ]
                                                                                                                                             

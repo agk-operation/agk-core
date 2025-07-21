@@ -99,7 +99,9 @@
     {% if object %}
     <div class="card shadow-sm mb-4">
       <div class="card-header d-flex justify-content-between align-items-center bg-white border-0">
-        <h5 class="mb-0">Order Batches</h5>
+        <h5 class="mb-0">
+          <a href="{% url 'orders:order-batch-list' object.pk  %}" >Order Batches</a>
+        </h5>
         <a href="{% url 'orders:batch-add' object.pk %}" class="btn btn-sm btn-success">
           <i class="bi bi-plus-lg"></i> New Batch
         </a>
@@ -120,7 +122,7 @@
                 <td>{{ batch.get_status_display }}</td>
                 <td>{{ batch.created_at|date:"d/m/Y H:i" }}</td>
                 <td>
-                  <a href="{% url 'orders:order-batch-list' object.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+                  <a href="{% url 'orders:batch-detail' order_pk=batch.order.pk pk=batch.pk %}" class="btn btn-sm btn-outline-primary">View</a>
                 </td>
               </tr>
               {% endfor %}

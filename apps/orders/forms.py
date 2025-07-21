@@ -207,34 +207,53 @@ class BaseBatchItemFormSet(BaseInlineFormSet):
 
     def clean(self):
         super().clean()
+        errors = []
 
-        totals = {}
+        # 1) Agrupa os forms não-deletados por OrderItem
         forms_per_item = {}
         for form in self.forms:
-            if self.can_delete and form.cleaned_data.get('DELETE'):
+            # pula forms com erro de validação de campo (não têm cleaned_data)
+            if not hasattr(form, 'cleaned_data'):
                 continue
-            oi = form.cleaned_data.get('order_item')
-            qty = form.cleaned_data.get('quantity')
-            if not oi or qty is None:
-                continue
-            totals.setdefault(oi, 0)
-            totals[oi] += qty
-            forms_per_item.setdefault(oi, []).append(form)
 
-        errors = []
-        for oi, new_qty in totals.items():
-          
-            if oi.shipped_qty + new_qty > oi.remaining_qty:
-                
+            data = form.cleaned_data
+            oi   = data.get('order_item')
+            qty  = data.get('quantity')
+            delete = data.get('DELETE') if self.can_delete else False
+
+            # só queremos os que têm order_item, quantidade e NÃO estão marcados p/ exclusão
+            if oi and qty is not None and not delete:
+                forms_per_item.setdefault(oi, []).append(form)
+
+        # 2) Para cada OrderItem, calcula:
+        #    shipped_other = soma de todas as quantidades já embarcadas
+        #                     EM OUTRAS batches (batch != esta)
+        #    max_shippable = quantidade total do pedido - shipped_other
+        for oi, forms in forms_per_item.items():
+            # soma o que já foi embarcado fora desta batch
+            shipped_other = (
+                oi.batchitem_set
+                  .exclude(batch=self.instance)  # exclui os desta batch
+                  .aggregate(total=Sum('quantity'))['total']
+                or 0
+            )
+
+            max_shippable = oi.quantity - shipped_other
+            new_total = sum(f.cleaned_data['quantity'] for f in forms)
+
+            if new_total > max_shippable:
                 msg = (
-                    f"Você está tentando embarcar {new_qty} unidades de “{oi.item.name}”, "
-                    f"mas só restam {oi.remaining_qty}."
+                    f"Você está tentando embarcar {new_total} unidades de “{oi.item.name}”, "
+                    f"mas só podem ser enviados {max_shippable} no total (já foram "
+                    f"{shipped_other} em outras batches)."
                 )
-                for f in forms_per_item[oi]:
+                # anexa o erro a cada form envolvido
+                for f in forms:
                     f.add_error('quantity', msg)
                 errors.append(msg)
-                
+
         if errors:
+            # dispara um ValidationError geral para interromper o save
             raise ValidationError("Existem itens com quantidade maior do que o disponível.")
         
 # final inlineformset, referenciando o BaseBatchItemFormSet
@@ -288,9 +307,30 @@ class BatchStageForm(forms.ModelForm):
         }
 
 
+class BaseBatchStageFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        errors = []
+        for i, form in enumerate(self.forms):
+
+            est = form.cleaned_data.get('estimated_completion')
+            act = form.cleaned_data.get('actual_completion')
+
+            # exemplo de regra: real só depois de previsto
+            if est and act and act < est:
+                msg = "Data real não pode ser anterior à data prevista."
+                form.add_error('actual_completion', msg)
+                errors.append(f"Linha {i+1}: {msg}")
+
+        if errors:
+            # isso vai aparecer em stages_fs.non_form_errors()
+            raise forms.ValidationError(errors)
+
+
 BatchStageFormSet = inlineformset_factory(
     OrderBatch, BatchStage,
     form=BatchStageForm,
+    formset=BaseBatchStageFormSet,
     extra=0,
     can_delete=True
 )

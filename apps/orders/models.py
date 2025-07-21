@@ -178,13 +178,13 @@ class OrderBatch(models.Model):
     def __str__(self):
         return f"Lote {self.batch_code} — {self.get_status_display()}"
 
+
 class BatchItem(models.Model):
     batch = models.ForeignKey(OrderBatch, related_name='batch_items', on_delete=models.CASCADE)
     order_item = models.ForeignKey(OrderItem,  on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
 
     def __str__(self):
         return f"{self.order_item.item.name} ({self.quantity})"

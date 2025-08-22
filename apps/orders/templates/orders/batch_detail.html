@@ -11,24 +11,39 @@
 
   <div class="card shadow-sm mb-4">
     <div class="card-body d-flex justify-content-between align-items-center">
-      <div>
-        <h3 class="mb-0">{% if batch %}Batch {{ batch.batch_code }}{% else %}New Batch{% endif %}</h3>
-        <small class="text-muted">{% if batch %}Generated on {{ batch.created_at|date:"F j, Y" }}{% endif %}</small>
-      </div>
-      <div class="btn-group">
-        <div class="d-flex justify-content-end p-1">
-          {% if batch %}
-            <a
-              href="{% url 'orders:batch-delete' order_pk=batch.order.pk pk=batch.pk %}"
-              class="btn btn-danger btn-sm"
-            >
-              <i class="bi bi-trash"></i> Excluir lote
-            </a>
-          {% endif %}
-        </div>
-        
-      </div>
+
+  {# Coluna esquerda: Batch + Status, e abaixo a data #}
+  <div class="d-flex flex-column gap-2">
+    <div class="d-flex align-items-baseline">
+      <h3 class="mb-0 me-3">
+        {% if batch %}Batch {{ batch.batch_code }}{% else %}New Batch{% endif %}
+      </h3>
+      {% if batch %}
+        <h5 class="mb-0 text-secondary">
+          {{ batch.get_status_display }}
+        </h5>
+      {% endif %}
     </div>
+    {% if batch %}
+      <small class="text-muted">
+        Generated on {{ batch.created_at|date:"F j, Y" }}
+      </small>
+    {% endif %}
+  </div>
+
+  {# Botão de excluir #}
+  <div class="btn-group">
+    {% if batch %}
+      <a
+        href="{% url 'orders:batch-delete' order_pk=batch.order.pk pk=batch.pk %}"
+        class="btn btn-danger btn-sm"
+      >
+        <i class="bi bi-trash"></i> Excluir lote
+      </a>
+    {% endif %}
+  </div>
+
+</div>
   </div> 
 
 
@@ -36,7 +51,7 @@
 
     {% if messages %}
       {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+        <div class="alert alert-danger alert-dismissible fade show">
           {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
       {% endfor %}
@@ -67,9 +82,11 @@
       <div class="col-md-3">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
-            <h6 class="mb-2">Payment</h6>
-            <p class="mb-2"><strong>Down Payment:</strong> {{ batch.order.down_payment|floatformat:2 }}%</p>
-            <p class="h5 mb-2">$ {{ batch_metrics.deposit_payment }}</p>
+            <h6 class="mb-2">Packing Data</h6>
+            <p class="mb-2"><strong>Gross Weight:   </strong>{{ batch_metrics.total_gw }}  Kg</p>
+            <p class="mb-2"><strong>Net Weight:   </strong>{{ batch_metrics.total_nw }}  Kg</p>
+            <p class="mb-2"><strong>Total Box Qty:   </strong>{{ batch_metrics.total_box_qty  }}</p>
+            <p class="mb-2"><strong>Total CBM:   </strong>{{ batch_metrics.total_cbm }} m³</p>
           </div>
         </div>
       </div>
@@ -78,6 +95,11 @@
           <div class="card-body">
             <h6 class="text-success mb-2">Order Total USD</h6>
             <p class="h5 mb-0">$ {{ batch_metrics.total_selling_price|default:"0.00" }}</p>
+            <p>
+              ----------------------------------
+            </p>
+            <p class="mb-2"><strong>Down Payment:</strong> {{ batch.order.down_payment|floatformat:2 }}%</p>
+            <p class="h5 mb-2">$ {{ batch_metrics.deposit_payment }}</p>
           </div>
         </div>
       </div>
@@ -85,7 +107,7 @@
     
    {% endif %}
    {% csrf_token %}
-   {{ batch_form.as_p }}
+
 
     {# — formset de Itens (prefix = batch_items) — #}
     {{ items_fs.management_form }}

@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Etapas Pré-Embarque #{{ shipment.pk }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Pré-Embarque #{{ shipment.pk }} — Etapas</h3>
+    <a href="{% url 'shipments:pre_shipment-detail' shipment.pk %}"
+       class="btn btn-outline-secondary btn-sm">
+      Ver Detalhe
+    </a>
+  </div>
+
+  <!-- Tabela de Batches (somente leitura) -->
+  <div class="card mb-4">
+    <div class="card-header">Batches Selecionados</div>
+    <div class="card-body p-0">
+      <table class="table mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Batch</th>
+            <th>Quantidade Carregada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sb in shipment.shipment_batches.all %}
+            <tr>
+              <td>{{ sb.order_batch }}</td>
+              <td>{{ sb.loaded_quantity }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {{ stages_fs.management_form }}
+
+    <!-- Etapas de Pré-Embarque -->
+    <div class="accordion mb-4" id="accordionPreStages">
+      {% for f in stages_fs.forms %}
+        {% if f.instance.stage.workflow == 'PRE' %}
+          <div class="accordion-item mb-2">
+            <h2 class="accordion-header" id="head{{ forloop.counter }}">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#collapse{{ forloop.counter }}">
+                {{ f.instance.stage.name }}
+              </button>
+            </h2>
+            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse"
+                 data-bs-parent="#accordionPreStages">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <!-- Previsto (só leitura) -->
+                  <div class="col-md-3">
+                    <label class="form-label">Previsto</label>
+                    <p class="form-control-plaintext">
+                      {{ f.instance.estimated_completion|date:"Y-m-d" }}
+                    </p>
+                  </div>
+                  <!-- Realizado -->
+                  <div class="col-md-3">
+                    <label class="form-label">{{ f.actual_completion.label }}</label>
+                    {{ f.actual_completion }}
+                    {% if f.actual_completion.errors %}
+                      <div class="text-danger small">{{ f.actual_completion.errors }}</div>
+                    {% endif %}
+                  </div>
+                  <!-- Observações -->
+                  <div class="col-md-4">
+                    <label class="form-label">{{ f.notes.label }}</label>
+                    {{ f.notes }}
+                    {% if f.notes.errors %}
+                      <div class="text-danger small">{{ f.notes.errors }}</div>
+                    {% endif %}
+                  </div>
+                  <!-- Anexo -->
+                  <div class="col-md-2">
+                    <label class="form-label">{{ f.attachment.label }}</label>
+                    {{ f.attachment }}
+                    {% if f.attachment.errors %}
+                      <div class="text-danger small">{{ f.attachment.errors }}</div>
+                    {% endif %}
+                  </div>
+                  <!-- Concluído -->
+                  <div class="col-md-2 d-flex align-items-center">
+                    <div class="form-check form-switch">
+                      {{ f.completed }}<label class="form-check-label ms-2">
+                        Concluído
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="text-end">
+      <button type="submit" class="btn btn-success">Salvar Etapas</button>
+      <a href="{% url 'shipments:pre_shipment-list' %}" class="btn btn-secondary ms-2">
+        Voltar
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

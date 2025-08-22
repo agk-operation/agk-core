@@ -7,6 +7,17 @@ class ItemModelApplicationInline(admin.TabularInline):
     extra = 1
 
 
+class ItemPackagingVersionInline(admin.TabularInline):
+    model = models.ItemPackagingVersion
+    extra = 0
+    fields = (
+        'valid_from','valid_to',
+        'net_weight','package_gross_weight',
+        'packing_lengh','packing_width','packing_height',
+        'individual_packing_size','individual_packing_type',
+    )
+
+
 @admin.register(models.Item)
 class ItemAdmin(admin.ModelAdmin):
     list_display = [field.name for field in models.Item._meta.fields]
@@ -14,6 +25,7 @@ class ItemAdmin(admin.ModelAdmin):
     search_fields = ('p_code', 'name')
     ordering      = ('p_code',)
     readonly_fields = ()  # adicione aqui campos apenas-leitura, se quiser
+    inlines = [ItemModelApplicationInline, ItemPackagingVersionInline]
 
     fieldsets = (
                 ('Basic Data', {

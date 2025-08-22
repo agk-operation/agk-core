@@ -10,6 +10,9 @@ urlpatterns = [
     path('<int:pk>/items/import/', views.OrderItemsImportView.as_view(), name='order-item-import'),
     path('items/import/new/', views.NewOrderItemsImportView.as_view(), name='order-item-import-new'),
     path('<int:pk>/update-margins/', views.UpdateOrderMarginsView.as_view(), name='order-update-margins'),
+    path('<int:order_pk>/packaging/', views.OrderItemPackagingListView.as_view(), name='order-item-packaging'),
+    path('<int:order_pk>/packaging/edit/', views.OrderItemPackagingUpdateView.as_view(), name='order-packaging-edit'),
+    
     # BATCHES
     path('batches/', views.AllBatchListView.as_view(), name='batch-list'),
     path('<int:order_pk>/batches/add/', views.OrderBatchCreateView.as_view(), name='batch-add'),

@@ -145,7 +145,7 @@ class OrderItemForm(forms.ModelForm):
 
     class Meta:
         model = OrderItem
-        fields = ('item', 'quantity', 'margin')
+        fields = ('item', 'packaging_version', 'quantity', 'margin')
         widgets = {
             'item': forms.Select(attrs={'class': 'form-select form-select-sm', 
                                         'style': 'max-width:300px;',}
@@ -172,6 +172,10 @@ class OrderItemForm(forms.ModelForm):
 
             except CustomerItemMargin.DoesNotExist:
                 pass
+            
+        if self.instance.pk and self.instance.order.is_locked:
+            self.fields['packaging_version'].disabled = True
+            self.fields['packaging_version'].widget.attrs['disabled'] = 'disabled'
 
 
 OrderItemFormSet = inlineformset_factory(
@@ -180,6 +184,26 @@ OrderItemFormSet = inlineformset_factory(
     extra=1,
     can_delete=True
 )
+
+class OrderItemPackagingForm(forms.ModelForm):
+    class Meta:
+        model = OrderItem
+        fields = ['packaging_version']
+        widgets = {
+            'packaging_version': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # filtra só as versões desse item, em ordem decrescente de validade
+        if self.instance and self.instance.item_id:
+            qs = self.instance.item.packaging_versions.order_by('-valid_from')
+            self.fields['packaging_version'].queryset = qs
+            # opcional: personalizar a label de cada opção
+            self.fields['packaging_version'].label_from_instance = (
+                lambda obj: f"{obj.valid_from:%Y-%m-%d %H:%M}"
+            )
+
 
 class BatchItemForm(forms.ModelForm):
     class Meta:
@@ -251,6 +275,7 @@ class BaseBatchItemFormSet(BaseInlineFormSet):
                 for f in forms:
                     f.add_error('quantity', msg)
                 errors.append(msg)
+
 
         if errors:
             # dispara um ValidationError geral para interromper o save

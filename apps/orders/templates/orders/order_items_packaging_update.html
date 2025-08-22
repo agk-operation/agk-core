@@ -1,0 +1,75 @@
+{# templates/orders/order_items_packaging_update.html #}
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Editar Embalagem — Pedido #{{ order.pk }}</h3>
+    <a href="{% url 'orders:order-item-packaging' order_pk=order.pk %}"
+       class="btn btn-secondary btn-sm">
+      Voltar
+    </a>
+  </div>
+
+  <form 
+    method="post"
+    action="{% url 'orders:order-packaging-edit' order_pk=order.pk %}?page={{ page_obj.number }}"
+    novalidate
+  >
+    {% csrf_token %}
+
+    <input type="hidden" name="page" value="{{ page_obj.number }}">
+
+    {# 1) Mostra erros gerais do formset (se houver) #}
+    {% if formset.non_form_errors %}
+      <div class="alert alert-danger">
+        {% for err in formset.non_form_errors %}
+          <div>{{ err }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {# 2) Essenciais para funcionamento do formset #}
+    {{ formset.management_form }}
+
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Quantidade</th>
+          <th>Versão Embalagem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for form in formset %}
+          <tr>
+            {# 3) hidden pk: necessário para o Django saber qual objeto atualizar #}
+            {% for hidden in form.hidden_fields %}
+              {{ hidden }}
+            {% endfor %}
+
+            <td>{{ form.instance.item.name }}</td>
+            <td>{{ form.instance.quantity }}</td>
+            <td>
+              {{ form.packaging_version }}
+              {# e, se tiver erro nesse campo, mostramos: #}
+              {% if form.packaging_version.errors %}
+                <div class="text-danger small">
+                  {{ form.packaging_version.errors.as_text }}
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="text-end mt-3">
+      <button type="submit" class="btn btn-primary">
+        Salvar Alterações
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

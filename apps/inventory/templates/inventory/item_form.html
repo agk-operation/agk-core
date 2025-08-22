@@ -1,19 +1,27 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load filters %}
+{% load crispy_forms_tags filters %}
 
-{% block title %}{{ object.pk|yesno:"Editar,Cadastrar Novo" }} Item{% endblock %}
+{% block title %}{{ object.pk|yesno:"Edit,Add New" }} Item{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-  <h3 class="display-6">{{ object.pk|yesno:"Editar,Cadastrar Novo" }} Item</h3>
+  <h3 class="display-6">{{ object.pk|yesno:"Edit,Add New" }} Item</h3>
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+      {% for err in form.non_field_errors %}
+        <div>{{ err }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
 
   <form method="post" novalidate>
     {% csrf_token %}
 
     <!-- CARD: Dados Básicos -->
     <div class="card mb-4">
-      <div class="card-header fw-bold">Dados Básicos</div>
+      <div class="card-header fw-bold">Basic Data</div>
       <div class="card-body">
         <div class="row g-3">
           {% for field in form %}
@@ -45,7 +53,7 @@
 
     <!-- CARD: Especificações -->
     <div class="card mb-4">
-      <div class="card-header fw-bold">Especificações</div>
+      <div class="card-header fw-bold">Specifications</div>
       <div class="card-body">
         <div class="row g-3">
           {% for field in form %}
@@ -76,10 +84,9 @@
     </div>
 
     <!-- CARD: Modelos Aplicáveis -->
-    <!-- CARD: Modelos Aplicáveis -->
     {% if formset %}
       <div class="card mb-4">
-        <div class="card-header fw-bold">Modelos Aplicáveis</div>
+        <div class="card-header fw-bold">Model Applications</div>
         <div class="card-body">
 
           {# Erros gerais do formset (não vinculados a campos específicos) #}
@@ -99,8 +106,8 @@
           <table class="table">
             <thead>
               <tr>
-                <th>Modelo</th>
-                <th>Ações</th>
+                <th>Model</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="model-application-grid">
@@ -145,10 +152,10 @@
 
                   <td>
                     {% if subform.instance.pk %}
-                      {{ subform.DELETE }} <label>Excluir</label>
+                      {{ subform.DELETE }} <label>Delete</label>
                     {% else %}
                       <button type="button" class="btn btn-danger btn-sm remove-model-row">
-                        Remover
+                        Remove
                       </button>
                     {% endif %}
                   </td>
@@ -175,37 +182,81 @@
                 </div>
               </td>
               <td>
-                <button type="button" class="btn btn-danger btn-sm remove-model-row">Remover</button>
+                <button type="button" class="btn btn-danger btn-sm remove-model-row">Remove</button>
               </td>
             </tr>
           </template>
 
           <button type="button" class="btn btn-primary" id="add-model-application">
-            Adicionar Modelo
+            Add Model
           </button>
         </div>
       </div>
     {% endif %}
 
     <!-- CARD: Packing Data -->
+    <!-- CARD: Versões de Embalagem (history + novo) -->
     <div class="card mb-4">
-      <div class="card-header fw-bold">Packing Data</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-bold">Packing Data</span>
+        <button class="btn btn-link p-0" 
+                type="button" 
+                data-bs-toggle="collapse" 
+                data-bs-target="#pack-history" 
+                aria-expanded="false" 
+                aria-controls="pack-history">
+          Show History ▼
+        </button>
+      </div>
       <div class="card-body">
-        <div class="row g-3">
-          {% for field in form %}
-            {% if field.name in 'net_weight package_gross_weight packing_lengh packing_width packing_height individual_packing_size individual_packing_type' %}
-              <div class="col-md-6">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}
-                  <div class="text-danger">{{ field.errors }}</div>
-                {% endif %}
-              </div>  
+        {{ packaging_fs.management_form }}
+
+        {#  Versão Atual (valid_to is null) #}
+        <h6>Current Versionl</h6>
+        {% for sub in packaging_fs.forms %}
+          {% if sub.instance.pk and not sub.instance.valid_to %}
+            <div class="mb-3">
+              {% crispy sub %}
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        {#  Histórico (valid_to != null), dentro de collapse #}
+        <div class="collapse mb-3" id="pack-history">
+          {% for sub in packaging_fs.forms %}
+            {% if sub.instance.pk and sub.instance.valid_to %}
+              <div class="border rounded p-2 mb-2 bg-light">
+                {% crispy sub %}
+              </div>
             {% endif %}
           {% endfor %}
         </div>
+
+        {# Container de novos forms que o usuário vai “clonar” #}
+        <div id="new-versions-container"></div>
+
+        {#  Botão pra adicionar outra versão #}
+        <button id="add-pack-version-btn" 
+                type="button" 
+                class="btn btn-primary btn-sm">
+          + Adicionar versão
+        </button>
       </div>
-    </div>  
+    </div>
+
+    {# Template invisível para clonar new forms #}
+    <template id="empty-pack-form-template">
+        <div class="pack-form mb-3 border rounded p-2" data-index="__prefix__">
+          {% crispy packaging_fs.empty_form %}
+          <div class="text-end">
+            <button type="button"
+                    class="btn btn-danger btn-sm remove-pack-version">
+              Remover versão
+            </button>
+          </div>
+        </div>
+      </template>
+
 
     <!-- CARD: Comercial Infos -->
     <div class="card mb-4">
@@ -229,7 +280,7 @@
 
     <!-- CARD: Códigos -->
     <div class="card mb-4">
-      <div class="card-header fw-bold">Códigos</div>
+      <div class="card-header fw-bold">Codes</div>
       <div class="card-body">
         <div class="row g-3">
           {% for field in form %}
@@ -249,7 +300,7 @@
 
     <!-- CARD: Dados Monetários -->
     <div class="card mb-4">
-      <div class="card-header fw-bold">Dados Monetários</div>
+      <div class="card-header fw-bold">Currency Data</div>
       <div class="card-body">
         <div class="row g-3">
           {% for field in form %}
@@ -280,7 +331,7 @@
     </div>
 
     <div class="text-end mt-4">
-      <button type="submit" class="btn btn-success">Salvar Item</button>
+      <button type="submit" class="btn btn-success">Save Item</button>
       <a href="{% url 'inventory:item-list' %}" class="btn btn-secondary ms-2">Voltar</a>
     </div>
   </form>
@@ -319,4 +370,60 @@
     removeButtonClass: 'remove-model-row'
   });
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const addBtn           = document.getElementById('add-pack-version-btn');
+  const container        = document.getElementById('new-versions-container');
+  const totalFormsInput  = document.getElementById('id_pack-TOTAL_FORMS');
+  const initialFormsInput= document.getElementById('id_pack-INITIAL_FORMS');
+  const emptyTemplate    = document.getElementById('empty-pack-form-template').innerHTML;
+
+  // Quantas versões já existiam (INITIAL_FORMS)
+  const initialCount = parseInt(initialFormsInput.value, 10);
+
+  // Função para reindexar todos os novos forms depois de remoção
+  function updateIndexes() {
+    const newForms = container.querySelectorAll('.pack-form');
+    newForms.forEach((formDiv, idx) => {
+      // Novo índice = initialCount + idx
+      const newIndex = initialCount + idx;
+      formDiv.dataset.index = newIndex;
+      // Para cada input/select/textarea e label, troque pack-N- por pack-newIndex-
+      formDiv.querySelectorAll('input, select, textarea, label').forEach(el => {
+        if (el.name) {
+          el.name = el.name.replace(/pack-\d+-/, `pack-${newIndex}-`);
+        }
+        if (el.id) {
+          el.id   = el.id.replace(/id_pack-\d+-/, `id_pack-${newIndex}-`);
+        }
+        if (el.htmlFor) {
+          el.htmlFor = el.htmlFor.replace(/id_pack-\d+-/, `id_pack-${newIndex}-`);
+        }
+      });
+    });
+    // TOTAL_FORMS = initial + número de .pack-form
+    totalFormsInput.value = initialCount + newForms.length;
+  }
+
+  // Adicionar nova versão (mesmo código de antes)
+  addBtn.addEventListener('click', () => {
+    let formCount = parseInt(totalFormsInput.value, 10);
+    const html = emptyTemplate.replace(/__prefix__/g, formCount);
+    container.insertAdjacentHTML('beforeend', html);
+    totalFormsInput.value = formCount + 1;
+  });
+
+  // Delegação: remover versão quando clicar no botão
+  container.addEventListener('click', function(e){
+    if (e.target.classList.contains('remove-pack-version')) {
+      e.preventDefault();
+      const formDiv = e.target.closest('.pack-form');
+      if (!formDiv) return;
+      formDiv.remove();
+      updateIndexes();
+    }
+  });
+});
+</script>
+
 {% endblock %}

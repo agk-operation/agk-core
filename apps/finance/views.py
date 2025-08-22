@@ -1,4 +1,4 @@
-from django.views.generic import CreateView, DetailView, DeleteView
+from django.views.generic import CreateView, DetailView, DeleteView, ListView
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.urls import reverse, reverse_lazy
@@ -6,6 +6,32 @@ from apps.orders.models import Order
 from .models import ProformaInvoice
 from .forms import ProformaInvoiceForm
 
+
+class ProformaInvoiceListView(ListView):
+    model = ProformaInvoice
+    template_name = 'finance/proforma_invoice_list.html'
+    context_object_name = 'proformas'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('order', 'order__customer', 'order__company', 'order__exporter')
+        customer = self.request.GET.get('customer')
+        company_id = self.request.GET.get('company')
+        
+        if customer:
+            qs = qs.filter(order__customer__icontains=customer)
+
+        if company_id:
+            qs = qs.filter(order__company_id=company_id)
+
+        return qs.order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['companies'] = Order.objects.values_list('company', flat=True).distinct()
+        context['selected_company'] = self.request.GET.get('company')
+        return context
+    
 
 class ProformaInvoiceCreateView(CreateView):
     model = ProformaInvoice

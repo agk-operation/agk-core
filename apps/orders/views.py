@@ -8,13 +8,14 @@ from django.contrib import messages
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import ListView, CreateView, UpdateView, View, DeleteView
-from django.forms import HiddenInput, inlineformset_factory
+from django.forms import HiddenInput, inlineformset_factory, modelformset_factory
 from django.db.models import Sum, F, DecimalField
-from apps.inventory.models import Item
+from django.db import transaction
+from apps.inventory.models import Item, ItemPackagingVersion
 from apps.pricing.models import CustomerItemMargin
 from apps.core.models import Company
 from .models import Order, OrderBatch, OrderItem, BatchStage, BatchItem, Stage
-from .forms import OrderItemForm, BatchItemFormSet, OrderForm, OrderBatchForm, OrderItemsImportForm, BatchStageFormSet
+from .forms import OrderItemForm, BatchItemFormSet, BatchItemForm, OrderForm, OrderBatchForm, OrderItemsImportForm, BatchStageFormSet, OrderItemPackagingForm
 from agk_core import metrics
 # —— ORDERS ——
 class OrderListView(ListView):  
@@ -113,8 +114,9 @@ class OrderItemsImportView(View):
             # tudo ok, cria o OrderItem
             oi = OrderItem.objects.create(
                 order = self.order,
-                item = inv_item,
-                quantity = qty, 
+                item = inv_item, 
+                packaging_version = inv_item.current_packaging_version(),
+                quantity = qty,
                 cost_price = inv_item.cost_price,   
             )
             try:
@@ -321,12 +323,38 @@ class OrderCreateView(CreateView):
         return context
     
     def form_valid(self, form):
-        self.object = form.save()
-        formset = self.get_context_data()['items_formset']
-        if formset.is_valid():
+        # salva o pedido primeiro
+        with transaction.atomic():
+            self.object = form.save()
+
+            # recupera o formset já ligado ao self.object
+            formset = self.get_context_data()['items_formset']
+
+            if not formset.is_valid():
+                # se o formset falhar, rola tudo para trás
+                return self.form_invalid(form)
+
+            # salva os OrderItem sem commitar para ajustar campos
             saved_items = formset.save(commit=False)
+
             for oi in saved_items:
+                # 1) garante o relacionamento com o pedido
+                oi.order = self.object
+
+                # 2) preço de custo
                 oi.cost_price = oi.item.cost_price
+
+                # 3) versão de embalagem vigente na criação
+                if oi.packaging_version_id is None:
+                    oi.packaging_version = (
+                        oi.item
+                          .packaging_versions
+                          .filter(valid_to__isnull=True)
+                          .order_by('-valid_from')
+                          .first()
+                    )
+
+                # 4) margem de cliente-item
                 if oi.margin is None:
                     try:
                         cim = CustomerItemMargin.objects.get(
@@ -336,13 +364,18 @@ class OrderCreateView(CreateView):
                         oi.margin = cim.margin
                     except CustomerItemMargin.DoesNotExist:
                         oi.margin = Decimal('0.00')
-                oi.save()
-            self.request.session.pop(self.sess_data_key, None)
-            self.request.session.pop(self.sess_items_key, None)
-            
-            return redirect(self.success_url)
 
-        return self.form_invalid(form)
+                # 5) salva o OrderItem definitivo
+                oi.save()
+
+            # (se houver deletes no formset)
+            formset.save_m2m()
+
+        # limpa sessão, redireciona...
+        self.request.session.pop(self.sess_data_key, None)
+        self.request.session.pop(self.sess_items_key, None)
+        return redirect(self.get_success_url())
+
 
     def form_invalid(self, form):
         return render(self.request, self.template_name, {
@@ -459,6 +492,14 @@ class OrderUpdateView(UpdateView):
             for oi in saved_items:
                 # aplica sempre o cost_price
                 oi.cost_price = oi.item.cost_price
+                if oi.packaging_version_id is None:
+                    oi.packaging_version = (
+                        oi.item
+                          .packaging_versions
+                          .filter(valid_to__isnull=True)
+                          .order_by('-valid_from')
+                          .first()
+                    )
                 # margem padrão só para itens novos sem margin
                 if oi.pk is None and oi.margin is None:
                     try:
@@ -520,6 +561,107 @@ class UpdateOrderMarginsView(View):
             f"{updated} item(s) tiveram a margem padrão aplicada."
         )
         return redirect('orders:order-edit', pk=order.pk)
+
+
+class OrderItemPackagingListView(View):
+    paginate_by   = 10
+    template_name = 'orders/order_items_list.html'
+
+    def get(self, request, order_pk):
+        order = get_object_or_404(Order, pk=order_pk)
+        q     = request.GET.get('q', '').strip()
+
+        # 1) base queryset de itens do pedido
+        qs = OrderItem.objects.filter(order=order).select_related('item')
+
+        # 2) aplica busca (se houver)
+        if q:
+            qs = qs.filter(item__name__icontains=q)
+
+        # 3) paginação
+        paginator = Paginator(qs.order_by('pk'), self.paginate_by)
+        page_obj  = paginator.get_page(request.GET.get('page'))
+
+        # 4) monta packaging_fields: tupla (nome_do_campo, verbose_name)
+        packaging_fields = [
+            (f.name, f.verbose_name)
+            for f in ItemPackagingVersion._meta.fields
+            if f.name in ItemPackagingVersion.PACKAGING_FIELDS
+        ]
+
+        return render(request, self.template_name, {
+            'order':            order,
+            'order_items':      page_obj.object_list,
+            'page_obj':         page_obj,
+            'packaging_fields': packaging_fields,
+            'q':                q,
+        })
+
+
+class OrderItemPackagingUpdateView(View):
+    template_name = 'orders/order_items_packaging_update.html'
+    paginate_by   = 10
+    prefix        = 'oi'
+
+    def get_page_number(self, request):
+        # tenta GET, senão POST (hidden input)
+        return request.GET.get('page') or request.POST.get('page')
+
+    def get_queryset(self, order):
+        return (
+            OrderItem.objects
+                     .filter(order=order)
+                     .select_related('item')
+                     .order_by('pk')
+        )
+
+    def get(self, request, order_pk):
+        order   = get_object_or_404(Order, pk=order_pk)
+        qs      = self.get_queryset(order)
+        page_no = self.get_page_number(request)
+        page    = Paginator(qs, self.paginate_by).get_page(page_no)
+
+        FormSet = modelformset_factory(
+            OrderItem,
+            form=OrderItemPackagingForm,
+            extra=0,
+            can_delete=False
+        )
+        formset = FormSet(queryset=page.object_list, prefix=self.prefix)
+
+        return render(request, self.template_name, {
+            'order':   order,
+            'formset': formset,
+            'page_obj': page,
+        })
+
+    def post(self, request, order_pk):
+        order   = get_object_or_404(Order, pk=order_pk)
+        qs      = self.get_queryset(order)
+        page_no = self.get_page_number(request)
+        page    = Paginator(qs, self.paginate_by).get_page(page_no)
+
+        FormSet = modelformset_factory(
+            OrderItem,
+            form=OrderItemPackagingForm,
+            extra=0,
+            can_delete=False
+        )
+        formset = FormSet(request.POST, queryset=page.object_list, prefix=self.prefix)
+
+        if formset.is_valid():
+            formset.save()
+            # volta pra MESMA página de edição
+            return redirect(
+                f"{request.path}?page={page.number}"
+            )
+
+        # em caso de erro de validação, renderiza de novo com erros
+        return render(request, self.template_name, {
+            'order':   order,
+            'formset': formset,
+            'page_obj': page,
+        })
     
 
 # —— BATCHES ——
@@ -570,65 +712,97 @@ class OrderBatchListView(ListView):
 
 class OrderBatchCreateView(View):
     template_name = 'orders/batch_create.html'
+    # instanciamos a fábrica de formset aqui pra não repetir
 
     def dispatch(self, request, *args, **kwargs):
         self.order = get_object_or_404(Order, pk=kwargs['order_pk'])
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
+        # formulário do cabeçalho do lote
         batch_form = OrderBatchForm(initial={'order': self.order})
-        form = OrderBatchForm(initial={'order': self.order})
         batch_form.fields['order'].widget = HiddenInput()
-        
-        extra_forms = 1
-        DynamicBatchItemFormSet = type(
-            'DynamicBatchItemFormSet',
-            (BatchItemFormSet,),
-            {'extra': extra_forms}
+
+        # formset de itens do lote, **sem** instância salva
+        # passamos um stub OrderBatch() que NÃO é usado pra filtrar nada
+        items_fs = BatchItemFormSet(
+            instance=OrderBatch(),  # ainda sem pk, mas só pra gerar os extras
+            prefix='items'
         )
 
-        items_fs = DynamicBatchItemFormSet(instance=OrderBatch(order=self.order))
-        # restringe queryset de order_item
+        # restringe o campo order_item a apenas itens desse pedido
         allowed = self.order.order_items.all()
         for f in items_fs.forms:
             f.fields['order_item'].queryset = allowed
 
         return render(request, self.template_name, {
-            'order': self.order,
-            'batch_form': batch_form,
-            'form': form,
-            'items_fs': items_fs,
+            'order':      self.order,
+            'form': batch_form,
+            'items_fs':   items_fs,
         })
 
     def post(self, request, *args, **kwargs):
         batch_form = OrderBatchForm(request.POST)
         batch_form.fields['order'].widget = HiddenInput()
 
-        items_fs = BatchItemFormSet(request.POST, instance=OrderBatch(order=self.order))
-        allowed = self.order.order_items.all()
-        for f in items_fs.forms:
-            f.fields['order_item'].queryset = allowed
+        # 1) primeiro valida só o batch_form
+        if not batch_form.is_valid():
+            # se o lote estourar validação, reexibe *somente* o batch_form
+            items_fs = BatchItemFormSet(
+                instance=OrderBatch(),
+                prefix='items'
+            )
+            for f in items_fs.forms:
+                f.fields['order_item'].queryset = self.order.order_items.all()
 
-        if batch_form.is_valid() and items_fs.is_valid():
+            return render(request, self.template_name, {
+                'order': self.order,
+                'form': batch_form,
+                'items_fs': items_fs,
+            })
+
+        # 2) batch_form válido → salva o OrderBatch e aí sim repassa ao formset
+        with transaction.atomic():
             batch = batch_form.save(commit=False)
             batch.order = self.order
             batch.save()
-            items_fs.instance = batch
+
+            # agora o formset é “atrelado” a um batch que já existe no banco
+            items_fs = BatchItemFormSet(
+                request.POST,
+                instance=batch,
+                prefix='items'
+            )
+
+            # de novo: restringe order_item
+            allowed = self.order.order_items.all()
+            for f in items_fs.forms:
+                f.fields['order_item'].queryset = allowed
+
+            # 3) valida o items_fs
+            if not items_fs.is_valid():
+                # se houver erro nos itens, reexibe junto com batch_form
+                return render(request, self.template_name, {
+                    'order':      self.order,
+                    'batch_form': batch_form,
+                    'items_fs':   items_fs,
+                })
+
+            # 4) tudo OK → salva os BatchItems
             items_fs.save()
 
-            # cria todas as etapas cadastradas como BatchStage (ativas por default)
+            # 5) cria os BatchStage
             for stage in Stage.objects.all().order_by('name'):
-                BatchStage.objects.create(batch=batch, stage=stage, active=True)
+                BatchStage.objects.create(
+                    batch=batch,
+                    stage=stage,
+                    active=True
+                )
 
-            return redirect('orders:batch-detail',
-                            order_pk=self.order.pk, pk=batch.pk)
-
-        return render(request, self.template_name, {
-            'order': self.order,
-            'batch_form': batch_form,
-            'items_fs': items_fs,
-        })
-
+        return redirect('orders:batch-detail',
+                        order_pk=self.order.pk,
+                        pk=batch.pk)
+    
 
 class OrderBatchDetailView(View):
     template_name = 'orders/batch_detail.html'
@@ -664,15 +838,12 @@ class OrderBatchDetailView(View):
         )
 
     def post(self, request, *args, **kwargs):
-        batch_form = OrderBatchForm(request.POST, instance=self.batch)
         items_fs = BatchItemFormSet(request.POST, instance=self.batch, prefix='batch_item')
         stages_fs = BatchStageFormSet(request.POST, instance=self.batch, prefix='batch_stages')
         
-        if batch_form.is_valid() and items_fs.is_valid() and stages_fs.is_valid():
-            batch_form.save()       # salva campos do batch
-            items_fs.save()         # cria/atualiza/deleta itens automaticamente
-            stages_fs.save()        # salva os estágios
-            print('valid')
+        if items_fs.is_valid() and stages_fs.is_valid(): 
+            items_fs.save()
+            stages_fs.save()
             
             return redirect(
                 'orders:batch-detail',
@@ -680,17 +851,9 @@ class OrderBatchDetailView(View):
                 pk=self.batch.pk
             )
 
-        else:
-            if not stages_fs.is_valid():
-                # erros gerais do formset
-                # erros de cada form individual
-                for idx, form in enumerate(stages_fs.forms):
-                    print(f"Form {idx} errors:", form.errors)
-
-            messages.error(request, 'Existem erros no formulário. Verifique os campos abaixo.')
+        messages.error(request, 'Existem erros no formulário. Verifique os campos abaixo.')
         
         return render(request, self.template_name, {
-            'batch_form': batch_form,
             'items_fs': items_fs,
             'stages_fs': stages_fs,
             'batch': self.batch,

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Shipment #{{ shipment.pk }} — {{ shipment.get_status_display }}</h2>
+  <p><strong>Signer:</strong> {{ shipment.signer }}</p>
+  <p><strong>Leader:</strong> {{ shipment.leader }}</p>
+  <p><strong>Ref. Cliente:</strong> {{ shipment.customer_reference }}</p>
+  <h4>Batches</h4>
+  <ul>
+    {% for sb in batches %}
+      <li>{{ sb.order_batch }}</li>
+    {% endfor %}
+  </ul>
+  <h4>Final Data</h4>
+  <p><strong>BL #:</strong> {{ shipment.bl_number }}</p>
+  <p><strong>BL Date:</strong> {{ shipment.bl_date }}</p>
+  <p><strong>Inspection #:</strong> {{ shipment.inspection_no }}</p>
+  <p><strong>ETA Dest.:</strong> {{ shipment.eta_destination }}</p>
+  <p><strong>ATA Dest.:</strong> {{ shipment.ata_destination }}</p>
+
+  <h4>Stages</h4>
+  <ul>
+    {% for ss in final_stages %}
+      <li>{{ ss.stage.name }}:
+        Previsto {{ ss.estimated_completion }} —
+        Real {{ ss.actual_completion }}</li>
+    {% endfor %}
+  </ul>
+
+  {% if shipment.status == shipment.STATUS_READY %}
+    <a href="{% url 'shipments:shipment-stages' shipment.pk %}"
+       class="btn btn-primary">Editar Final Shipment</a>
+  {% endif %}
+{% endblock %}

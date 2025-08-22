@@ -10,7 +10,13 @@ class OrderItemInline(admin.TabularInline):
 class BatchStageInline(admin.TabularInline):
     model = BatchStage
     extra = 1
-    readonly_fields = ()   # você pode tornar campos somente-leitura se quiser
+    fields = ('item', 'packaging_version', 'quantity', 'margin')
+
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if obj and obj.is_locked:
+            ro.append('packaging_version')
+        return ro
 
 
 @admin.register(Order)

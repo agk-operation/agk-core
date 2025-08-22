@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+Proformas
+{% endblock %}
+
+{% block content %}
+
+<div class="row mb-4"></div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <form method="get" action="{% url 'finance:proforma-list' %}">
+            <div class="input-group">
+                <input type="text" class="form-control" name="customer" placeholder="Cliente" value="{{ request.GET.customer }}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"> Pesquisar</i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <form method="get" action="{% url 'finance:proforma-list' %}">
+            <div class="input-group">
+                <select class="form-select" name="company">
+                    <option value="" {% if not selected_company %}selected{% endif %}>Todas as companhias</option>
+                    {% for company in companies %}
+                        <option value="{{ company.id }}" {% if selected_company == company.id %}selected{% endif %}>{{ company }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-filter"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>Companhia</th>
+                <th>Exportador</th>
+                <th>Criada em</th>
+                <th>PDF</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pi in proformas %}
+            <tr>
+                <td>{{ pi.id }}</td>
+                <td>{{ pi.order.customer }}</td>
+                <td>{{ pi.order.company }}</td>
+                <td>{{ pi.order.exporter }}</td>
+                <td>{{ pi.created_at|date:"d/m/Y H:i" }}</td>
+                <td>
+                    {% if pi.pdf %}
+                        <a href="{{ pi.pdf.url }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+                            <i class="bi bi-file-earmark-pdf"></i> Abrir
+                        </a>
+                    {% else %}
+                        <span class="text-muted">Não gerado</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'finance:proforma-detail' pi.id %}" class="btn btn-info btn-sm">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    <a href="{% url 'finance:proforma-delete' pi.id %}" class="btn btn-danger btn-sm">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">Nenhuma Proforma encontrada.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'components/_pagination.html' %}
+
+{% endblock %}

@@ -14,9 +14,15 @@
             </a>
           </li>
           <li>
-            <a href="#" class="nav-link px-0 align-middle">
-                <i class="bi bi-person-lines-fill fs-4"></i>
-              <span class="ms-1">Customers</span>
+            <a href="{% url 'shipments:pre_shipment-list' %}" class="nav-link px-0 align-middle">
+                <i class="bi bi-box-seam"></i>
+              <span class="ms-1">Pre-Loading</span>
+            </a>
+          </li>
+          <li>
+            <a href="{% url 'shipments:pre_shipment-list' %}" class="nav-link px-0 align-middle">
+                <i class="bi bi-box-seam-fill"></i>
+              <span class="ms-1">Shipments</span>
             </a>
           </li>
           <li>
@@ -26,27 +32,9 @@
             </a>
           </li>
           <li>
-            <a href="#" class="nav-link px-0 align-middle">
-              <i class="bi bi-truck fs-4"></i>
-              <span class="ms-1">Fornecedores</span>
-            </a>
-          </li>
-          <li>
-            <a href="#" class="nav-link px-0 align-middle">
-              <i class="bi bi-tags fs-4"></i>
-              <span class="ms-1">Lotes</span>
-            </a>
-          </li>
-          <li>
             <a href="{% url 'inventory:item-list' %}" class="nav-link px-0 align-middle">
               <i class="bi bi-box-seam fs-4"></i>
               <span class="ms-1">Produtos</span>
-            </a>
-          </li>
-          <li>
-            <a href="#" class="nav-link px-0 align-middle">
-              <i class="bi bi-arrow-up-right fs-4"></i>
-              <span class="ms-1">Entradas</span>
             </a>
           </li>
           <li>
@@ -62,9 +50,9 @@
             </a>
           </li>
           <li>
-            <a href="#" class="nav-link px-0 align-middle">
+            <a href="{% url 'finance:proforma-list' %}" class="nav-link px-0 align-middle">
                 <i class="bi bi-bank fs-4"></i>
-              <span class="ms-1">Faturas</span>
+              <span class="ms-1">Proforma Inv.</span>
             </a>
           </li>
           <li>

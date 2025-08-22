@@ -2,6 +2,8 @@ from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
+from django.db import transaction
+from django.utils import timezone
 from . import models
 from . import forms
 
@@ -23,63 +25,79 @@ CREATE_URLS = {
     'model_application':  'inventory:modelapplication-create',
     'currency':           'inventory:currency-create',
 }
-FORMSET_PREFIX = 'itemmodelapplication_set'
-SUCCESS_URL = reverse_lazy('inventory:item-list')
+APP_FS_PREFIX   = 'itemmodelapplication_set'
+PACK_FS_PREFIX  = 'pack'
 
 
 class ItemCreateUpdateView(View):
-    """
-    Se pk fornecido, faz update; se não, create.
-    """
-
     def get(self, request, pk=None):
-        if pk is not None:
-            item = get_object_or_404(models.Item, pk=pk)
-            form = forms.ItemForm(instance=item)
-            formset = forms.ItemModelApplicationFormSet(
-                instance=item,
-                prefix=FORMSET_PREFIX
-            )
-        else:
-            item = None
-            form = forms.ItemForm()
-            formset = forms.ItemModelApplicationFormSet(
-                prefix=FORMSET_PREFIX
-            )
+        item = get_object_or_404(models.Item, pk=pk) if pk else models.Item()
+        form = forms.ItemForm(instance=item)
+        fs_app  = forms.ItemModelApplicationFormSet(instance=item, prefix=APP_FS_PREFIX)
+        fs_pack = forms.ItemPackagingVersionFormSet(instance=item, prefix=PACK_FS_PREFIX)
+
+        # Desabilita ONLY os campos dos forms históricos (pk existente)
+        if item.pk:
+            for sub in fs_pack.forms:
+                if sub.instance.pk:
+                    for fld in sub.fields.values():
+                        fld.disabled = True
+                        fld.widget.attrs['disabled'] = True
 
         return render(request, 'inventory/item_form.html', {
             'form': form,
-            'formset': formset,
+            'formset': fs_app,
+            'packaging_fs': fs_pack,
+            'packaging_fields': models.ItemPackagingVersion.PACKAGING_FIELDS,
             'create_urls': CREATE_URLS,
+            'object': item,
         })
-
 
     def post(self, request, pk=None):
-        if pk is not None:
-            item = get_object_or_404(models.Item, pk=pk)
-            form = forms.ItemForm(request.POST, instance=item)
-            formset = forms.ItemModelApplicationFormSet(
-                request.POST,
-                instance=item,
-                prefix=FORMSET_PREFIX
-            )
-        else:
-            form = forms.ItemForm(request.POST)
-            formset = forms.ItemModelApplicationFormSet(
-                request.POST,
-                prefix=FORMSET_PREFIX
-            )
-        if form.is_valid() and formset.is_valid():
-            obj = form.save()
-            formset.instance = obj
-            formset.save()
-            return redirect(SUCCESS_URL)
+        item = get_object_or_404(models.Item, pk=pk) if pk else models.Item()
+        form = forms.ItemForm(request.POST, request.FILES or None, instance=item)
+        fs_app  = forms.ItemModelApplicationFormSet(
+                      request.POST, instance=item, prefix=APP_FS_PREFIX)
+        fs_pack = forms.ItemPackagingVersionFormSet(
+                      request.POST, instance=item, prefix=PACK_FS_PREFIX)
 
-        return render(request, 'inventory/item_form.html', {
-            'form': form,
-            'formset': formset,
-            'create_urls': CREATE_URLS,
-        })
+        # Pule validação do blank form NÃO alterado
+        for sub in fs_pack.forms:
+            if not sub.instance.pk and not sub.has_changed():
+                sub.empty_permitted = True
+
+        form_valid    = form.is_valid()
+        fs_app_valid  = fs_app.is_valid()
+        fs_pack_valid = fs_pack.is_valid()
+
+        print(">>> POST keys:", request.POST.keys())
+        print(">>> fs_pack.prefix:", fs_pack.prefix)
+
+        if not (form_valid and fs_app_valid and fs_pack_valid):
+            return render(request, 'inventory/item_form.html', {
+                'form': form,
+                'formset': fs_app,
+                'packaging_fs': fs_pack,
+                'packaging_fields': models.ItemPackagingVersion.PACKAGING_FIELDS,
+                'create_urls': CREATE_URLS,
+                'object': item,
+            })
+
+        with transaction.atomic():
+            item = form.save()
+            fs_app.instance = item
+            fs_app.save()
+
+            # Seta default valid_from onde for novo e sem data
+            for sub in fs_pack.forms:
+                if not sub.instance.pk and sub.has_changed():
+                    if not sub.cleaned_data.get('valid_from'):
+                        sub.cleaned_data['valid_from'] = timezone.now()
+
+            fs_pack.instance = item
+            fs_pack.save()
+
+        return redirect('inventory:item-list')
 
 
 class ItemDeleteView(DeleteView):
@@ -129,3 +147,47 @@ for model_name in RELATED_MODELS:
 
     globals()[f'{model_name}CreateView'] = create_view
     globals()[f'{model_name}UpdateView'] = update_view
+
+
+class ItemPackagingUpdateView(View):
+    template_name = 'inventory/item_packaging.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.item = get_object_or_404(models.Item, pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        current = self.item.current_packaging_version()
+        initial = {}
+        if current:
+            for f in models.ItemPackagingVersion.PACKAGING_FIELDS:
+                initial[f] = getattr(current, f)
+        else:
+            for f in models.ItemPackagingVersion.PACKAGING_FIELDS:
+                initial[f] = getattr(self.item, f)
+        return initial
+
+    def get(self, request, *args, **kwargs):
+        form = forms.ItemPackagingVersionForm(initial=self.get_initial())
+        return render(request, self.template_name, {'form': form, 'item': self.item})
+
+    def post(self, request, *args, **kwargs):
+        form = forms.ItemPackagingVersionForm(request.POST)
+        if form.is_valid():
+            now = timezone.now()
+            current = self.item.current_packaging_version()
+            if current:
+                current.valid_to = now
+                current.save()
+            pkg = form.save(commit=False)
+            pkg.item = self.item
+            pkg.valid_from = now
+            pkg.save()
+
+            for f in models.ItemPackagingVersion.PACKAGING_FIELDS:
+                setattr(self.item, f, getattr(pkg, f))
+            self.item.save()
+
+            return redirect('inventory:item-edit', pk=self.item.pk)
+
+        return render(request, self.template_name, {'form': form, 'item': self.item})

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db.models import Sum
 from apps.core.models import Customer, Exporter, Company, Port, SalesRepresentative, BusinessUnit, Project, OrderType
-from apps.inventory.models import Item
+from apps.inventory.models import Item, ItemPackagingVersion
 
 
 class Order(models.Model):
@@ -121,6 +121,13 @@ class OrderItem(models.Model):
         default=Decimal('0.00'),
         validators=[MinValueValidator(Decimal("0.00"))]
     )
+    packaging_version = models.ForeignKey(
+        'inventory.ItemPackagingVersion',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='order_items',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -139,7 +146,14 @@ class OrderItem(models.Model):
         """Quantidade que ainda resta embarcar."""
         return self.quantity - self.shipped_qty
 
+    @property
+    def total(self):
+        return self.sale_price * self.quantity
+    
     def save(self, *args, **kwargs):
+        if not self.pk and not self.packaging_version:
+            self.packaging_version = self.item.current_packaging_version()
+            
         if self.item.currency == 'USD':
             self.cost_price_usd = self.cost_price or Decimal('0.00')
         else:
@@ -152,12 +166,11 @@ class OrderItem(models.Model):
 
         super().save(*args, **kwargs)
 
-    @property
-    def total(self):
-        return self.sale_price * self.quantity
-
     def __str__(self):
         return f"{self.item.name} ({self.remaining_qty})"
+    
+    class Meta:
+        ordering = ['pk']
     
 
 class OrderBatch(models.Model):
@@ -193,13 +206,15 @@ class BatchItem(models.Model):
 class Stage(models.Model):
     name = models.CharField("Etapa", max_length=100)
     description = models.TextField(blank=True, null=True)
+    sort_order  = models.PositiveIntegerField(default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Stage"
         verbose_name_plural = "Stages"
-        ordering = ['name']
+        ordering = ['sort_order', 'name']
 
     def __str__(self):
         return f"{self.name}"
@@ -234,7 +249,7 @@ class BatchStage(models.Model):
     class Meta:
         verbose_name = "Batch Stage"
         verbose_name_plural = "Batch Stages"
-        ordering = ['estimated_completion']
+        ordering = ['stage__sort_order']
 
     def __str__(self):
         return f"{self.stage.name} — {self.estimated_completion or 'No Date Yet'}"

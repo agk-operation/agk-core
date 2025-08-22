@@ -1,0 +1,292 @@
+{# templates/shipments/pre_shipment_form.html #}
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+{% load crispy_forms_tags %}
+
+{% block title %}Shipment {{ form.instance.pk|default:"Novo" }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  {# Cabeçalho com card #}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body d-flex justify-content-between align-items-center">
+      <div class="d-flex flex-column gap-2">
+        <div class="d-flex align-items-baseline">
+          <h3 class="mb-0 me-3">
+            {% if form.instance.pk %}Shipment {{ form.instance.pk }}{% else %}New Shipment{% endif %}
+          </h3>
+          {% if form.instance.pk %}
+            <h5 class="mb-0 text-secondary">{{ form.instance.get_status_display }}</h5>
+          {% endif %}
+        </div>
+        {% if form.instance.pk %}
+          <small class="text-muted">
+            Generated at {{ form.instance.created_at|date:"F j, Y" }}
+          </small>
+        {% endif %}
+      </div>
+      {% if form.instance.pk %}
+      <div class="btn-group">
+        <form method="post"
+              action="{% url 'shipments:pre_shipment-delete' form.instance.pk %}"
+              onsubmit="return confirm('Confirma exclusão deste pré-embarque?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-trash"></i> Excluir
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+
+  {# — Header  — #}
+
+  <div class="accordion mb-4" id="mainFormAccordion">
+    <div class="accordion-item accordion-main">
+      <h2 class="accordion-header" id="mainFormHeading">
+        <button class="accordion-button shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#mainFormCollapse" aria-expanded="true">
+          Dados do Pré-Embarque
+        </button>
+      </h2>
+      <div id="mainFormCollapse" class="accordion-collapse collapse show" data-bs-parent="#mainFormAccordion">
+        <div class="accordion-body">
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {{ form.non_field_errors }}
+            </div>
+          {% endif %}
+
+          {% crispy form %}
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  {% if form.instance.pk %}
+  <div class="row gx-3 mb-4">
+    <div class="col-md-3">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-3">Order Details</h6>
+          <p class="mb-2"><strong>Signer:</strong> {{ object.signer }}</p>
+          <p class="mb-2"><strong>Leader:</strong> {{ object.leader }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h6 class="text-success mb-2">Shipping</h6>
+          <p class="mb-2"><strong>Port Loading:</strong> {{ object.pod }}</p>
+          <p class="mb-2"><strong>Port Discharge:</strong> {{ object.pol }}</p>
+        </div>
+      </div>
+    </div>
+     <div class="col-md-3">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h6 class="mb-2">Packing Data</h6>
+            <p class="mb-2"><strong>Gross Weight:   </strong>{{ shipment_metrics.total_gw }}  Kg</p>
+            <p class="mb-2"><strong>Net Weight:   </strong>{{ shipment_metrics.total_nw }}  Kg</p>
+            <p class="mb-2"><strong>Total Box Qty:   </strong>{{ shipment_metrics.total_box_qty  }}</p>
+            <p class="mb-2"><strong>Total CBM:   </strong>{{ shipment_metrics.total_cbm }} m³</p>
+          </div>
+        </div>
+      </div>
+  </div>
+  {% endif %}
+
+  {# — Batches (formset) — #}
+  <h5>Batches</h5>
+  {{ batch_fs.management_form }}
+  {% if batch_fs.non_form_errors %}
+    <div class="alert alert-danger">
+      {{ batch_fs.non_form_errors }}
+    </div>
+  {% endif %}
+  <table class="table">
+    <thead><tr><th>Batch</th>
+      {% if not read_only %}<th>Ações</th>{% endif %}
+    </tr></thead>
+    <tbody id="batches-grid">
+      {% for sub in batch_fs.forms %}
+        <tr>
+          <td>
+            {% if not read_only %}
+            {% if sub.instance.pk %}
+              {{ sub.id }}
+            {% endif %}
+              {{ sub.order_batch }} {{ sub.order_batch.errors }}
+            {% else %}
+              {{ sub.instance.order_batch }}
+            {% endif %}
+            {% if sub.non_field_errors %}
+              <div class="text-danger small">
+                {{ sub.non_field_errors }}
+              </div>
+            {% endif %}
+          </td>
+          {% if not read_only %}
+          <td>
+            {% if sub.instance.pk %}
+              {{ sub.DELETE }} <small>Excluir</small>
+            {% else %}
+              <button class="btn btn-sm btn-danger remove-row">–</button>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="3">No batch.</td></tr>
+      {% endfor %}
+      <tr class="batch-row d-none">
+        {% for hidden in batch_fs.empty_form.hidden_fields %}
+          {{ hidden }}
+        {% endfor %}
+        <td>{{ batch_fs.empty_form.order_batch }}</td>
+        <td>
+          <button type="button" class="btn btn-sm btn-danger remove-row">–</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  {% if not read_only %}
+  <button id="add-batch" class="btn btn-secondary btn-sm mb-4">
+    + Add Batch
+  </button>
+  {% endif %}
+
+  {# — Etapas — #}
+  <h5>CheckList</h5>
+    {{ stages_fs.management_form }}
+    <div class="accordion mb-4">
+      {% for sd in stages_data %}
+        {% with f=sd.form st=sd.stage %}
+          <div class="accordion-item">
+            {% for hidden in sd.form.hidden_fields %}
+              {{ hidden }}
+            {% endfor %}
+            <h2 class="accordion-header">
+              <button class="accordion-button" type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#stage{{ forloop.counter }}">
+                {{ sd.stage.name }}
+              </button>
+            </h2>
+            <div id="stage{{ forloop.counter }}" class="accordion-collapse collapse{% if f.errors %} show{% endif %}">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  {% if f.non_field_errors %}
+                    <div class="col-12">
+                      <div class="alert alert-danger p-2">
+                        {{ f.non_field_errors }}
+                      </div>
+                    </div>
+                  {% endif %}
+                  <div class="col-md-4">
+                    <label>Previsto</label>
+                    {% if not read_only %}
+                      {{ f.estimated_completion }}
+                      {% if f.estimated_completion.errors %}
+                        <div class="text-danger small">{{ f.estimated_completion.errors }}</div>
+                      {% endif %}
+                    {% else %}
+                      <p class="form-control-plaintext">
+                        {{ f.instance.estimated_completion|date:"Y-m-d" }}
+                      </p>
+                    {% endif %}
+                  </div>
+                  <div class="col-md-4">
+                    <label>Realizado</label>
+                    {% if not read_only %}
+                      {{ f.actual_completion }}
+                      {% if f.actual_completion.errors %}
+                        <div class="text-danger small">{{ f.actual_completion.errors }}</div>
+                      {% endif %}
+                    {% else %}
+                      <p class="form-control-plaintext">
+                        {{ f.instance.actual_completion|date:"Y-m-d" }}
+                      </p>
+                    {% endif %}
+                  </div>
+                  <div class="col-md-4">
+                    <label>Notes</label>
+                    {% if not read_only %}
+                      {{ f.notes }} {{ f.notes.errors }}<br>
+                      {% if f.attachment %}
+                        <label>File</label>
+                        {{ f.attachment }}
+                        {% if f.notes.errors %}
+                          <div class="text-danger small">{{ f.notes.errors }}</div>
+                        {% endif %}
+                      {% endif %}
+                    {% else %}
+                      <p class="form-control-plaintext">{{ f.instance.notes }}</p>
+                      {% if f.instance.attachment %}
+                        <a href="{{ f.instance.attachment.url }}">Download</a>
+                      {% endif %}
+                      <p>{% if f.instance.actual_completion %}✅{% else %}❌{% endif %}</p>
+                    {% endif %}
+                    {% for field in f.visible_fields %}
+                      {% if field.name not in 'stage estimated_completion actual_completion notes attachment' %}
+                        <div class="col-md-4">
+                          {{ field.label_tag }} {{ field }}
+                          {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors }}</div>
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endwith %}
+      {% endfor %}
+    </div>
+
+
+    {# — Botões de ação — #}
+    <div class="d-flex justify-content-end mt-4">
+      <button type="submit" class="btn btn-success me-2">Salvar</button>
+      <a href="{% url 'shipments:pre_shipment-list' %}" class="btn btn-outline-secondary">Voltar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Exemplo de JS para clonar linhas do formset de batches
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const addBtn = document.getElementById('add-batch');
+    const grid   = document.getElementById('batches-grid');
+    const total  = document.getElementById('id_sb-TOTAL_FORMS');
+    const template = document.getElementById('batches-grid').querySelector('.batch-row.d-none')?.outerHTML;
+
+    addBtn?.addEventListener('click', ()=>{
+      let count = parseInt(total.value,10);
+      const row = template.replace(/__prefix__/g, count)
+        .replace('d-none','');
+      grid.insertAdjacentHTML('beforeend', row);
+      total.value = count + 1;
+    });
+
+    grid.addEventListener('click', e=>{
+      if(e.target.closest('.remove-row')){
+        e.target.closest('.batch-row').remove();
+      }
+    });
+  });
+</script>
+{% endblock %}
+

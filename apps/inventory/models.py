@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from apps.core.models import  Supplier, Currency
 
 
@@ -102,14 +103,6 @@ class Item(models.Model):
     chain = models.ForeignKey(Chain, on_delete=models.PROTECT)
     ncm = models.ForeignKey(Ncm, on_delete=models.PROTECT)
     model_application = models.ManyToManyField(ModelApplication, through='ItemModelApplication')
-
-    net_weight = models.DecimalField(max_digits=10, decimal_places=4)
-    package_gross_weight = models.DecimalField(max_digits=10, decimal_places=4)
-    packing_lengh = models.DecimalField(max_digits=10, decimal_places=4)
-    packing_width = models.DecimalField(max_digits=10, decimal_places=4)
-    packing_height = models.DecimalField(max_digits=10, decimal_places=4)
-    individual_packing_size = models.DecimalField(max_digits=10, decimal_places=4)    
-    individual_packing_type = models.CharField(max_length=200)
     
     moq = models.IntegerField()
 
@@ -118,6 +111,14 @@ class Item(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def current_packaging_version(self):
+        return (
+            self.packaging_versions
+                .filter(valid_to__isnull=True)
+                .order_by('-valid_from')
+                .first()
+        )
 
     def __str__(self):
         return self.name
@@ -132,4 +133,47 @@ class ItemModelApplication(models.Model):
 
     #def __str__(self):
     #    return self.item
+
+
+class ItemPackagingVersion(models.Model):
+    """Historical record of an Item packaging configuration."""
+
+    PACKAGING_FIELDS = [
+        'net_weight', 'package_gross_weight', 'packing_lengh',
+        'packing_width', 'packing_height', 'individual_packing_size',
+        'individual_packing_type', 'qty_per_master_box'
+    ]
+
+    item = models.ForeignKey(
+        Item,
+        related_name='packaging_versions',
+        on_delete=models.CASCADE,
+    )
+    net_weight = models.DecimalField(max_digits=10, decimal_places=4)
+    package_gross_weight = models.DecimalField(max_digits=10, decimal_places=4)
+    packing_lengh = models.DecimalField(max_digits=10, decimal_places=4)
+    packing_width = models.DecimalField(max_digits=10, decimal_places=4)
+    packing_height = models.DecimalField(max_digits=10, decimal_places=4)
+    individual_packing_size = models.DecimalField(max_digits=10, decimal_places=4)
+    individual_packing_type = models.CharField(max_length=200)
+    qty_per_master_box = models.PositiveBigIntegerField()
+
+    valid_from = models.DateTimeField()
+    valid_to = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+    def save(self, *args, **kwargs):
+        # ao criar um novo, fecha a anterior
+        if not self.pk:
+            ItemPackagingVersion.objects.filter(
+                item=self.item,
+                valid_to__isnull=True
+            ).update(valid_to=self.valid_from)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.item.name} — {self.valid_from:%Y-%m-%d}"
 

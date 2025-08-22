@@ -8,6 +8,7 @@ urlpatterns = [
     path('item/create/', views.ItemCreateUpdateView.as_view(), name='item-create'),
     path('item/<int:pk>/edit/', views.ItemCreateUpdateView.as_view(), name='item-edit'),
     path('item/<int:pk>/delete/', views.ItemDeleteView.as_view(), name='item-delete'),
+    path('item/<int:pk>/packaging/', views.ItemPackagingUpdateView.as_view(), name='item-packaging'),
 ]
 
 for name in [

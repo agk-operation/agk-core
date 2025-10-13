@@ -1,6 +1,7 @@
 import pandas as pd
 from decimal import Decimal
 from django.http import HttpResponseForbidden
+from django.utils.dateparse import parse_date
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy, reverse
 from django.core.paginator import Paginator
@@ -17,6 +18,7 @@ from apps.core.models import Company
 from .models import Order, OrderBatch, OrderItem, BatchStage, BatchItem, Stage
 from .forms import OrderItemForm, BatchItemFormSet, BatchItemForm, OrderForm, OrderBatchForm, OrderItemsImportForm, BatchStageFormSet, OrderItemPackagingForm
 from agk_core import metrics
+
 # —— ORDERS ——
 class OrderListView(ListView):  
     model = Order
@@ -28,12 +30,29 @@ class OrderListView(ListView):
         queryset = super().get_queryset().select_related('customer')
         customer = self.request.GET.get('customer')
         company_id = self.request.GET.get('company')
+        status_id = self.request.GET.get('status')
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
         if customer:
             queryset = queryset.filter(customer__name__icontains=customer)
         
         if company_id:
             queryset = queryset.filter(company_id=company_id)
-            
+
+        if status_id:
+            queryset = queryset.filter(order_status_id=status_id)
+
+        if start_date:
+            parsed_start = parse_date(start_date)
+            if parsed_start:
+                queryset = queryset.filter(created_at__date__gte=parsed_start)
+
+        if start_date:
+            parsed_end = parse_date(end_date)
+            if parsed_end:
+                queryset = queryset.filter(created_at__date__lte=parsed_end)
+
+           
         return queryset
 
     def get_context_data(self, **kwargs):

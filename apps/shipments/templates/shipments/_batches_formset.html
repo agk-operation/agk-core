@@ -1,0 +1,76 @@
+{# Batches (formset) #}
+<h5>Batches</h5>
+{{ batch_fs.management_form }}
+{% if batch_fs.non_form_errors %}
+  <div class="alert alert-danger">{{ batch_fs.non_form_errors }}</div>
+{% endif %}
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Batch</th>
+      {% if not read_only %}<th>Ações</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody id="batches-grid">
+    {% for sub in batch_fs.forms %}
+      <tr class="batch-row">
+        <td>
+          {% if not read_only %}
+            {% if sub.instance.pk %}{{ sub.id }}{% endif %}
+            {{ sub.order_batch }} {{ sub.order_batch.errors }}
+          {% else %}
+            {{ sub.instance.order_batch }}
+          {% endif %}
+          {% if sub.non_field_errors %}
+            <div class="text-danger small">{{ sub.non_field_errors }}</div>
+          {% endif %}
+        </td>
+        {% if not read_only %}
+        <td>
+          {% if sub.instance.pk %}
+            {{ sub.DELETE }} <small>Excluir</small>
+          {% else %}
+            <button type="button" class="btn btn-sm btn-danger remove-row">–</button>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+    {% empty %}
+      <tr><td colspan="3">No batch.</td></tr>
+    {% endfor %}
+    {# Linha-templete para inserir novas entradas do formset #}
+    <tr class="batch-row d-none">
+      {% for hidden in batch_fs.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+      <td>{{ batch_fs.empty_form.order_batch }}</td>
+      <td><button type="button" class="btn btn-sm btn-danger remove-row">–</button></td>
+    </tr>
+  </tbody>
+</table>
+
+{% if not read_only %}
+  <button id="add-batch" class="btn btn-secondary btn-sm mb-4">+ Add Batch</button>
+{% endif %}
+
+{# JS de clonagem (igual ao seu) #}
+<script>
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const addBtn   = document.getElementById('add-batch');
+    const grid     = document.getElementById('batches-grid');
+    const total    = document.getElementById('id_sb-TOTAL_FORMS');
+    const template = grid.querySelector('.batch-row.d-none')?.outerHTML;
+
+    addBtn?.addEventListener('click', ()=>{
+      let count = parseInt(total.value,10);
+      const row = template.replace(/__prefix__/g, count).replace('d-none','');
+      grid.insertAdjacentHTML('beforeend', row);
+      total.value = count + 1;
+    });
+
+    grid.addEventListener('click', e=>{
+      if(e.target.closest('.remove-row')){
+        e.target.closest('.batch-row').remove();
+      }
+    });
+  });
+</script>

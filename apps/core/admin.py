@@ -2,16 +2,10 @@ from django.contrib import admin
 from . import models
 
 
-class ExporterInline(admin.TabularInline):
-    model = models.Exporter
-    extra = 1
-
-
 @admin.register(models.Company)
 class CompanyAdmin(admin.ModelAdmin):
     list_display = ('name', 'address', 'country')
     search_fields = ('name',)
-    inlines = [ExporterInline]
 
 
 @admin.register(models.Exporter)

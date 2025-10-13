@@ -175,10 +175,14 @@ class OrderItem(models.Model):
 
 class OrderBatch(models.Model):
     STATUS_CHOICES = [
-        ('created', 'Criado'),
-        ('pending', 'Pendente'),
-        ('shipped', 'Enviado'),
-        ('cancelled', 'Cancelado'),
+        ('negotiation', 'In Negotiation'),
+        ('production', 'In Production'),
+        ('pre', 'Pre Shipment'),
+        ('pre', 'Pre Shipment'),
+        ('transit', 'In Transit'),
+        ('delivered', 'Delivered'),
+        ('stb', 'Stand by'),
+        ('canceled', 'Canceled'),
     ]
 
     order = models.ForeignKey(Order, related_name='batches', on_delete=models.CASCADE)

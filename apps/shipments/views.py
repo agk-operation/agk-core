@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse
 from django.views import View, generic
 from django.db import transaction
 from django.http import Http404
@@ -12,31 +13,34 @@ from .forms  import ShipmentForm, ShipmentBatchFormSet, ShipmentStageFormSet, Sh
 
 class PreShipmentListView(generic.ListView):
     model = Shipment
-    template_name = 'shipments/pre_shipment_list.html'
-    context_object_name = 'pre_shipments'
+    template_name = 'shipments/shipment_list.html'
 
     def get_queryset(self):
         return Shipment.objects.filter(status=Shipment.STATUS_PRELOADING)
+    
+    def get_context_data(self, **kwargs):
+            context = super().get_context_data(**kwargs)
+            context['pre_loading'] = True
+            return context
 
 
 class PreShipmentCreateView(View):
-    template_name = 'shipments/pre_shipment_form.html'
-
-    
+    template_name = 'shipments/shipment_form.html'  # unificado
 
     def get(self, request):
+        # Form principal (pré)
         form = ShipmentForm()
         batch_fs = ShipmentBatchFormSet(prefix='sb')
 
-        # 1) Carrega os stages
+        # Stages de PRE em ordem
         pre_stages = list(
             Stage.objects
                  .filter(workflow=Stage.WORKFLOW_PRELOADING)
                  .order_by('sort_order')
         )
 
+        # Construção dos forms de stage "soltos" (não formset)
         fake_shipment = Shipment()
-        # 2) Cria um formulário por etapa, com initial + stage associado
         stage_forms = []
         for stage in pre_stages:
             instance = ShipmentStage(stage=stage, shipment=fake_shipment)
@@ -47,29 +51,33 @@ class PreShipmentCreateView(View):
             )
             stage_forms.append({'stage': stage, 'form': form_stage})
 
-        return render(request, self.template_name, {
-            'form': form,
+        ctx = {
+            'phase': 'pre',
+            'object': fake_shipment,           # para header/cards
+            'main_form': form,                 # <- unificado
             'batch_fs': batch_fs,
-            'stages_fs': None,  # não estamos usando formset aqui
-            'stages_data': stage_forms,
+            'stages_fs': None,                 # não usamos formset no pré
+            'stages_forms': stage_forms,       # <- unificado (antes: stages_data)
             'read_only': False,
             'is_create': True,
-        })
+            'show_batches': True,
+            'delete_url': None,
+            'cancel_url': reverse('shipments:pre_shipment-list'),
+        }
+        return render(request, self.template_name, ctx)
 
     def post(self, request):
         form = ShipmentForm(request.POST)
         batch_fs = ShipmentBatchFormSet(request.POST, request.FILES, prefix='sb')
 
-        # 1) Carrega os stages na ordem correta
         pre_stages = list(
             Stage.objects
                 .filter(workflow=Stage.WORKFLOW_PRELOADING)
                 .order_by('sort_order')
         )
 
-        fake_shipment = Shipment()  # usado para construção inicial
+        fake_shipment = Shipment()
 
-        # 2) Constrói os formulários de etapa bindados
         stage_forms = []
         stage_form_objects = []
         forms_valid = True
@@ -77,26 +85,22 @@ class PreShipmentCreateView(View):
         for stage in pre_stages:
             prefix = f"st-{stage.pk}"
             instance = ShipmentStage(stage=stage, shipment=fake_shipment)
-
             form_stage = ShipmentStageForm(
                 request.POST, request.FILES,
                 prefix=prefix,
                 instance=instance,
                 shipment=fake_shipment
             )
-
             if not form_stage.is_valid():
                 forms_valid = False
-
             stage_forms.append({'stage': stage, 'form': form_stage})
             stage_form_objects.append(form_stage)
 
-        # 3) Validação completa
         if form.is_valid() and batch_fs.is_valid() and forms_valid:
             with transaction.atomic():
                 shipment = form.save(commit=False)
 
-                # Salva dados dinâmicos de etapas no shipment
+                # Persiste campos dinâmicos mapeados dos stages para o shipment
                 for form_stage in stage_form_objects:
                     stage = form_stage.instance.stage
                     for cfg in stage.field_configs.all():
@@ -107,11 +111,11 @@ class PreShipmentCreateView(View):
                 shipment.status = Shipment.STATUS_PRELOADING
                 shipment.save()
 
-                # Salva os batches
+                # Batches
                 batch_fs.instance = shipment
                 batch_fs.save()
 
-                # Cria as etapas
+                # Cria as ShipmentStage
                 for form_stage in stage_form_objects:
                     new_stage = form_stage.save(commit=False)
                     new_stage.shipment = shipment
@@ -119,31 +123,31 @@ class PreShipmentCreateView(View):
 
             return redirect('shipments:pre_shipment-edit', pk=shipment.pk)
 
-        # 4) Se inválido, reexibe o form
-        return render(request, self.template_name, {
-            'form': form,
+        # Re-render com o template unificado
+        ctx = {
+            'phase': 'pre',
+            'object': fake_shipment,
+            'main_form': form,
             'batch_fs': batch_fs,
             'stages_fs': None,
-            'stages_data': stage_forms,
+            'stages_forms': stage_forms,
             'read_only': False,
             'is_create': True,
-        })
-    
+            'show_batches': True,
+            'delete_url': None,
+            'cancel_url': reverse('shipments:pre_shipment-list'),
+        }
+        return render(request, self.template_name, ctx)
+
 
 class PreShipmentUpdateView(View):
-    template_name = 'shipments/pre_shipment_form.html'
+    template_name = 'shipments/shipment_form.html'  # unificado
 
     def dispatch(self, request, *args, **kwargs):
-        self.shipment = get_object_or_404(
-            Shipment,
-            pk=kwargs['pk']
-        )
+        self.shipment = get_object_or_404(Shipment, pk=kwargs['pk'])
         return super().dispatch(request, *args, **kwargs)
 
     def ensure_pre_stages(self, shipment):
-        """
-        Garante que para cada Stage de workflow PRE exista um ShipmentStage.
-        """
         existing = { ss.stage_id for ss in shipment.stages.all() }
         qs = Stage.objects.filter(workflow=Stage.WORKFLOW_PRELOADING).order_by('sort_order')
         for st in qs:
@@ -152,14 +156,11 @@ class PreShipmentUpdateView(View):
 
     def get(self, request, pk):
         shipment = get_object_or_404(Shipment, pk=pk, status=Shipment.STATUS_PRELOADING)
-
-        # Garante que todas as etapas necessárias existem
         self.ensure_pre_stages(shipment)
 
-        form  = ShipmentForm(instance=shipment)
+        form = ShipmentForm(instance=shipment)
         batch_fs = ShipmentBatchFormSet(instance=shipment, prefix='sb')
 
-        # 1) Busca as etapas e os respectivos ShipmentStages
         pre_stages = Stage.objects.filter(
             workflow=Stage.WORKFLOW_PRELOADING
         ).order_by('sort_order')
@@ -174,25 +175,29 @@ class PreShipmentUpdateView(View):
             )
             stage_forms.append({'stage': stage, 'form': form_stage})
 
-        return render(request, self.template_name, {
-            'form': form,
+        ctx = {
+            'phase': 'pre',
+            'object': shipment,
+            'main_form': form,                  # <- unificado
             'batch_fs': batch_fs,
             'stages_fs': None,
-            'stages_data': stage_forms,
+            'stages_forms': stage_forms,        # <- unificado
             'read_only': False,
             'is_create': False,
-            'shipment_metrics': metrics.get_shipment_metrics(self.shipment.pk)
-        })
+            'show_batches': True,
+            'delete_url': reverse('shipments:pre_shipment-delete', args=[shipment.pk]),
+            'cancel_url': reverse('shipments:pre_shipment-list'),
+            'shipment_metrics': metrics.get_shipment_metrics(self.shipment.pk),
+        }
+        return render(request, self.template_name, ctx)
 
     def post(self, request, pk):
         shipment = get_object_or_404(Shipment, pk=pk, status=Shipment.STATUS_PRELOADING)
-
         self.ensure_pre_stages(shipment)
 
         form = ShipmentForm(request.POST, instance=shipment)
         batch_fs = ShipmentBatchFormSet(request.POST, prefix='sb', instance=shipment)
 
-        # 1) Etapas do workflow
         pre_stages = Stage.objects.filter(
             workflow=Stage.WORKFLOW_PRELOADING
         ).order_by('sort_order')
@@ -215,41 +220,43 @@ class PreShipmentUpdateView(View):
             stage_forms.append({'stage': stage, 'form': form_stage})
             stage_form_objects.append(form_stage)
 
-        # Validação combinada
         if form.is_valid() and batch_fs.is_valid() and forms_valid:
             with transaction.atomic():
-                shipment = form.save(commit=False)
-                # Atualiza os campos dinâmicos no objeto `shipment`
+                shp = form.save(commit=False)
                 for form_stage in stage_form_objects:
                     stage = form_stage.instance.stage
                     for cfg in stage.field_configs.all():
                         fname = cfg.field_name
                         if fname in form_stage.cleaned_data:
-                            setattr(shipment, fname, form_stage.cleaned_data[fname])
+                            setattr(shp, fname, form_stage.cleaned_data[fname])
                 batch_fs.save()
                 for form_stage in stage_form_objects:
                     form_stage.save()
                 if all(
                     ss.actual_completion
-                    for ss in shipment.stages.filter(stage__workflow=Stage.WORKFLOW_PRELOADING)
+                    for ss in shp.stages.filter(stage__workflow=Stage.WORKFLOW_PRELOADING)
                 ):
-                    shipment.status = Shipment.STATUS_READY
-                
-                shipment.save()
-                    
+                    shp.status = Shipment.STATUS_READY
+                shp.save()
 
             return redirect('shipments:pre_shipment-edit', pk=shipment.pk)
 
-        # Se inválido, reexibe
-        return render(request, self.template_name, {
-            'form': form,
+        ctx = {
+            'phase': 'pre',
+            'object': shipment,
+            'main_form': form,
             'batch_fs': batch_fs,
             'stages_fs': None,
-            'stages_data': stage_forms,
+            'stages_forms': stage_forms,
             'read_only': False,
             'is_create': False,
-            'shipment_metrics': metrics.get_shipment_metrics(self.shipment.pk)
-        })
+            'show_batches': True,
+            'delete_url': reverse('shipments:pre_shipment-delete', args=[shipment.pk]),
+            'cancel_url': reverse('shipments:pre_shipment-list'),
+            'shipment_metrics': metrics.get_shipment_metrics(self.shipment.pk),
+        }
+        return render(request, self.template_name, ctx)
+
 
 
 class PreShipmentDeleteView(View):
@@ -264,6 +271,17 @@ class PreShipmentDeleteView(View):
 #  Views para a fase de SHIPMENT FINAL (status = RDY ou SHP)
 # ───────────────────────────────────────────────────────────
 
+class ShipmentListView(generic.ListView):
+    model = Shipment
+    template_name = 'shipments/shipment_list.html'
+
+    def get_queryset(self):
+        return Shipment.objects.exclude(status=Shipment.STATUS_PRELOADING)
+    
+    def get_context_data(self, **kwargs):
+            context = super().get_context_data(**kwargs)
+            context['pre_loading'] = False
+            return context
 
 
 class FinalShipmentDetailView(generic.DetailView):
@@ -280,39 +298,44 @@ class FinalShipmentDetailView(generic.DetailView):
 
 class ShipmentUpdateView(View):
     """
-    Exibe as etapas (pré-embarque para leitura e final para edição).
-    Ao completar todas as etapas de SHIPMENT, define status=RDY.
+    Exibe as etapas (pré-embarque em leitura e final para edição).
+    Ao completar todas as etapas de SHIPMENT, define status=SHIPPED.
     """
-    template_name = 'shipments/shipment_stages.html'
+    template_name = 'shipments/shipment_form.html'  # unificado
 
     def ensure_all_stages(self, shipment):
-        """Garante que existam ShipmentStage para todas as Stages PRE e SHIPMENT."""
         existing = {ss.stage_id for ss in shipment.stages.all()}
-        # pré‐loading (leitura apenas)
         for st in Stage.objects.filter(workflow=Stage.WORKFLOW_PRELOADING):
             if st.pk not in existing:
                 ShipmentStage.objects.create(shipment=shipment, stage=st)
-        # final shipment (edição)
         for st in Stage.objects.filter(workflow=Stage.WORKFLOW_SHIPMENT):
             if st.pk not in existing:
                 ShipmentStage.objects.create(shipment=shipment, stage=st)
 
     def get(self, request, pk):
         shipment = get_object_or_404(Shipment, pk=pk)
-        # só permite editar final se está READY
         if shipment.status != Shipment.STATUS_READY:
             raise Http404("Este shipment não está pronto para edição final.")
         self.ensure_all_stages(shipment)
+        batch_fs = ShipmentBatchFormSet(instance=shipment, prefix='sb')
 
-        # Form de campos finais
         final_form = FinalShipmentForm(instance=shipment)
-        # FormSet de etapas (já inclui todas as PRE e SHIPMENT)
         stages_fs  = ShipmentStageFormSet(instance=shipment, prefix='st')
-        return render(request, self.template_name, {
-            'shipment':   shipment,
-            'final_form': final_form,
-            'stages_fs':  stages_fs,
-        })
+
+        ctx = {
+            'phase': 'final',
+            'object': shipment,
+            'main_form': final_form,
+            'batch_fs': batch_fs,
+            'stages_fs': stages_fs,
+            'stages_forms': None,
+            'show_batches': True,
+            'read_only': False,
+            'delete_url': None,
+            'shipment_metrics': metrics.get_shipment_metrics(shipment.pk),
+            #'cancel_url': reverse('shipments:shipment-detail', args=[shipment.pk]),
+        }
+        return render(request, self.template_name, ctx)
 
     def post(self, request, pk):
         shipment = get_object_or_404(Shipment, pk=pk)
@@ -331,18 +354,25 @@ class ShipmentUpdateView(View):
             with transaction.atomic():
                 final_form.save()
                 stages_fs.save()
-                # se todas as etapas de workflow SHIPMENT foram concluídas:
                 done = all(
                     ss.actual_completion
-                    for ss in shipment.stages.filter(workflow=Stage.WORKFLOW_SHIPMENT)
+                    for ss in shipment.stages.filter(stage__workflow=Stage.WORKFLOW_SHIPMENT)
                 )
                 if done:
                     shipment.status = Shipment.STATUS_SHIPPED
                     shipment.save()
             return redirect('shipments:shipment-detail', pk=pk)
 
-        return render(request, self.template_name, {
-            'shipment':   shipment,
-            'final_form': final_form,
-            'stages_fs':  stages_fs,
-        })
+        ctx = {
+            'phase': 'final',
+            'object': shipment,
+            'main_form': final_form,
+            'batch_fs': None,
+            'stages_fs': stages_fs,
+            'stages_forms': None,
+            'show_batches': False,
+            'read_only': False,
+            'delete_url': None,
+            #'cancel_url': reverse('shipments:shipment-detail', args=[shipment.pk]),
+        }
+        return render(request, self.template_name, ctx)

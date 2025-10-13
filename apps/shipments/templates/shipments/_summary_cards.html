@@ -1,0 +1,32 @@
+{# Cards de resumo #}
+<div class="row gx-3 mb-4">
+  <div class="col-md-3">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h6 class="mb-3">Order Details</h6>
+        <p class="mb-2"><strong>Signer:</strong> {{ object.signer }}</p>
+        <p class="mb-2"><strong>Leader:</strong> {{ object.leader }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h6 class="text-success mb-2">Shipping</h6>
+        <p class="mb-2"><strong>Port Loading:</strong> {{ object.pod }}</p>
+        <p class="mb-2"><strong>Port Discharge:</strong> {{ object.pol }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h6 class="mb-2">Packing Data</h6>
+        <p class="mb-2"><strong>Gross Weight:</strong> {{ shipment_metrics.total_gw }} Kg</p>
+        <p class="mb-2"><strong>Net Weight:</strong> {{ shipment_metrics.total_nw }} Kg</p>
+        <p class="mb-2"><strong>Total Box Qty:</strong> {{ shipment_metrics.total_box_qty }}</p>
+        <p class="mb-2"><strong>Total CBM:</strong> {{ shipment_metrics.total_cbm }} m³</p>
+      </div>
+    </div>
+  </div>
+</div>

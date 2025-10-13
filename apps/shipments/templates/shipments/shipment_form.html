@@ -1,0 +1,69 @@
+{# templates/shipments/shipment_form.html #}
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+  Shipment {{ object.pk|default:"Novo" }}
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+  {# Cabeçalho unificado #}
+  {% include "shipments/_header.html" with object=object status_display=object.get_status_display delete_url=delete_url %}
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+
+    {# Form principal (pré ou final) - usa crispy #}
+    <div class="accordion mb-4" id="mainFormAccordion">
+      <div class="accordion-item accordion-main">
+        <h2 class="accordion-header" id="mainFormHeading">
+          <button class="accordion-button shadow-sm" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#mainFormCollapse" aria-expanded="true">
+            {% if phase == 'pre' %}Dados do Pré-Embarque{% else %}Dados Finais{% endif %}
+          </button>
+        </h2>
+        <div id="mainFormCollapse" class="accordion-collapse collapse show" data-bs-parent="#mainFormAccordion">
+          <div class="accordion-body">
+            {% if main_form.non_field_errors %}
+              <div class="alert alert-danger">{{ main_form.non_field_errors }}</div>
+            {% endif %}
+            {% crispy main_form %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Cards de resumo quando existir objeto #}
+    {% if object.pk %}
+      {% include "shipments/_summary_cards.html" with object=object shipment_metrics=shipment_metrics %}
+    {% endif %}
+
+    {# Batches (somente no pré; opcional mostrar no final via flag) #}
+    {% if show_batches %}
+      {% include "shipments/_batches_formset.html" with batch_fs=batch_fs read_only=read_only %}
+    {% endif %}
+
+    {# Checklist: podemos mostrar um ou dois accordions conforme a fase #}
+    {% if phase == 'final' %}
+      <h5 class="mt-5">Checklist Final</h5>
+      {% include "shipments/_stages_section.html" with forms=stages_fs.forms workflow_code='SHP' accordion_id='finalStagesAccordion' %}
+      <h5 class="mt-4">Checklist Pré-Embarque</h5>
+      {% include "shipments/_stages_section.html" with forms=stages_fs.forms workflow_code='PRE' accordion_id='preStagesAccordion' %}
+    {% else %}
+      <h5>CheckList</h5>
+      {# Pré mostra conjunto único conforme seu pre_shipment_form atual (usando a mesma ideia de fields) #}
+      {% include "shipments/_stages_section.html" with forms=stages_forms workflow_code=None accordion_id='preOnlyAccordion' pre_layout=True read_only=read_only %}
+    {% endif %}
+
+    <div class="d-flex justify-content-end mt-4">
+      <button type="submit" class="btn btn-success me-2">
+        {% if phase == 'pre' %}Salvar{% else %}Salvar Final Shipment{% endif %}
+      </button>
+      <a href="{{ cancel_url }}" class="btn btn-outline-secondary">Voltar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

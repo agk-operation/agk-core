@@ -1,0 +1,99 @@
+{# Accordion de Stages. Dois modos:                                                                                          #}
+{#    - Modo FINAL: filtra por workflow_code ('PRE' ou 'SHP'), campos todos em col-md-4 (similar ao shipment_stages.html).   #}
+{#    - Modo PRE (pre_layout=True): layout com Previsto/Realizado/Notes/Attachment e status (igual ao seu pre_shipment_form).#}
+
+
+<div class="accordion mb-4" id="{{ accordion_id }}">
+  {% if pre_layout %}
+    {# PRE-LAYOUT DETALHADO #}
+    {% for sd in stages_forms %}
+      {% with f=sd.form st=sd.stage %}
+        <div class="accordion-item">
+          {% for hidden in sd.form.hidden_fields %}{{ hidden }}{% endfor %}
+          <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#stage{{ forloop.counter }}">{{ sd.stage.name }}</button>
+          </h2>
+          <div id="stage{{ forloop.counter }}" class="accordion-collapse collapse{% if f.errors %} show{% endif %}">
+            <div class="accordion-body">
+              <div class="row g-3">
+                {% if f.non_field_errors %}
+                  <div class="col-12"><div class="alert alert-danger p-2">{{ f.non_field_errors }}</div></div>
+                {% endif %}
+                <div class="col-md-4">
+                  <label>Previsto</label>
+                  {% if not read_only %}
+                    {{ f.estimated_completion }}
+                    {% if f.estimated_completion.errors %}<div class="text-danger small">{{ f.estimated_completion.errors }}</div>{% endif %}
+                  {% else %}
+                    <p class="form-control-plaintext">{{ f.instance.estimated_completion|date:"Y-m-d" }}</p>
+                  {% endif %}
+                </div>
+                <div class="col-md-4">
+                  <label>Realizado</label>
+                  {% if not read_only %}
+                    {{ f.actual_completion }}
+                    {% if f.actual_completion.errors %}<div class="text-danger small">{{ f.actual_completion.errors }}</div>{% endif %}
+                  {% else %}
+                    <p class="form-control-plaintext">{{ f.instance.actual_completion|date:"Y-m-d" }}</p>
+                  {% endif %}
+                </div>
+                <div class="col-md-4">
+                  <label>Notes</label>
+                  {% if not read_only %}
+                    {{ f.notes }} {{ f.notes.errors }}<br>
+                    {% if f.attachment %}
+                      <label>File</label>
+                      {{ f.attachment }}
+                    {% endif %}
+                  {% else %}
+                    <p class="form-control-plaintext">{{ f.instance.notes }}</p>
+                    {% if f.instance.attachment %}<a href="{{ f.instance.attachment.url }}">Download</a>{% endif %}
+                    <p>{% if f.instance.actual_completion %}✅{% else %}❌{% endif %}</p>
+                  {% endif %}
+
+                  {# Campos extras não listados acima #}
+                  <div class="row g-3 mt-1">
+                    {% for field in f.visible_fields %}
+                      {% if field.name not in 'stage estimated_completion actual_completion notes attachment' %}
+                        <div class="col-md-4">
+                          {{ field.label_tag }} {{ field }}
+                          {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endwith %}
+    {% endfor %}
+  {% else %}
+    {# FINAL LAYOUT (filtrado por workflow_code) #}
+    {% for sf in forms %}
+      {% if sf.instance.stage.workflow == workflow_code %}
+        <div class="accordion-item">
+          {% for h in sf.hidden_fields %}{{ h }}{% endfor %}
+          <h2 class="accordion-header" id="head-{{ accordion_id }}-{{ forloop.counter }}">
+            <button class="accordion-button collapsed" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#body-{{ accordion_id }}-{{ forloop.counter }}">
+              {{ sf.instance.stage.name }}
+            </button>
+          </h2>
+          <div id="body-{{ accordion_id }}-{{ forloop.counter }}"
+               class="accordion-collapse collapse" data-bs-parent="#{{ accordion_id }}">
+            <div class="accordion-body row g-3">
+              {% for fld in sf.visible_fields %}
+                <div class="col-md-4">
+                  {{ fld.label_tag }} {{ fld }} {{ fld.errors }}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+</div>

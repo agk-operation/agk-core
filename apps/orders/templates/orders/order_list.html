@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+Vendas
+{% endblock %}
+
+{% block content %}
+
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{% url 'orders:order-add' %}" class="btn btn-success btn-sm float-end">
+            <i class="bi bi-plus-lg"></i> New Order
+        </a>
+    </div>
+</div>
+
+<!-- Filtro avançado componentizado -->
+{% include 'orders/components/_filter.html' %}
+
+
+
+<!-- Tabela de pedidos -->
+<div class="table-responsive shadow-sm rounded overflow-hidden">
+    <table class="table table-hover table-bordered mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>Exportador</th>
+                <th>Companhia</th>
+                <th>Criada em</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.id }}</td>
+                <td>{{ order.customer }}</td>
+                <td>{{ order.exporter }}</td>
+                <td>{{ order.company }}</td>
+                <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <a href="{% url 'orders:order-edit' order.id %}" class="btn btn-warning btn-sm">
+                        <i class="bi bi-pencil-square"></i>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center">Nenhum pedido encontrado.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'components/_pagination.html' %}
+
+{% endblock %}

@@ -1,4 +1,6 @@
 from django.views import View
+from django.core.exceptions import PermissionDenied
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
@@ -8,11 +10,12 @@ from . import models
 from . import forms
 
 
-class ItemListView(ListView):
+class ItemListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = models.Item
     template_name = 'inventory/item_list.html'
     context_object_name = 'items'
     paginate_by = 25
+    permission_required = 'inventory.view_item'
 
 CREATE_URLS = {
     'category':           'inventory:category-create',
@@ -29,7 +32,27 @@ APP_FS_PREFIX   = 'itemmodelapplication_set'
 PACK_FS_PREFIX  = 'pack'
 
 
-class ItemCreateUpdateView(View):
+class ItemCreateUpdateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    model = models.Item
+    def get_object(self):
+        pk = self.kwargs.get('pk')
+        if pk:
+            return get_object_or_404(self.model, pk=pk)
+        return self.model()  # instância nova
+    '''
+    ajustar, não fucnionou...
+    def handle_no_permission(self):
+        raise PermissionDenied("Você não tem permissão para realizar essa ação.")
+    '''
+    def has_permission(self):
+        obj = self.get_object()
+        if obj.pk:
+            perm = f'{self.model._meta.app_label}.change_{self.model._meta.model_name}'
+        else:
+            perm = f'{self.model._meta.app_label}.add_{self.model._meta.model_name}'
+        return self.request.user.has_perm(perm)
+
+
     def get(self, request, pk=None):
         item = get_object_or_404(models.Item, pk=pk) if pk else models.Item()
         form = forms.ItemForm(instance=item)
@@ -100,11 +123,12 @@ class ItemCreateUpdateView(View):
         return redirect('inventory:item-list')
 
 
-class ItemDeleteView(DeleteView):
+class ItemDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     model = models.Item
     template_name = 'inventory/item_delete.html'
     success_url = reverse_lazy('inventory:item-list')
     context_object_name = 'item'
+    permission_required = 'inventory.delete_item'
 
 
 RELATED_MODELS = [
@@ -119,9 +143,10 @@ for model_name in RELATED_MODELS:
 
     create_view = type(
         f'{model_name}CreateView',
-        (CreateView,),
+        (LoginRequiredMixin, PermissionRequiredMixin, CreateView,),
         {
             'model': model,
+            'permission_required': f'inventory.add_{model._meta.model_name}',
             'form_class': form_class,
             'template_name': f'_generic_form.html',
             'success_url': reverse_lazy('inventory:item-create'),
@@ -133,10 +158,11 @@ for model_name in RELATED_MODELS:
 
     update_view = type(
         f'{model_name}UpdateView',
-        (UpdateView,),
+        (LoginRequiredMixin, PermissionRequiredMixin, UpdateView,),
         {
             'model': model,
             'form_class': form_class,
+            'permission_required': f'inventory.change_{model._meta.model_name}',
             'template_name': f'_generic_form.html',
             'success_url': reverse_lazy('inventory:item-create'),
             'extra_context': {
@@ -156,38 +182,60 @@ class ItemPackagingUpdateView(View):
         self.item = get_object_or_404(models.Item, pk=kwargs['pk'])
         return super().dispatch(request, *args, **kwargs)
 
-    def get_initial(self):
-        current = self.item.current_packaging_version()
-        initial = {}
-        if current:
-            for f in models.ItemPackagingVersion.PACKAGING_FIELDS:
-                initial[f] = getattr(current, f)
-        else:
-            for f in models.ItemPackagingVersion.PACKAGING_FIELDS:
-                initial[f] = getattr(self.item, f)
-        return initial
-
     def get(self, request, *args, **kwargs):
-        form = forms.ItemPackagingVersionForm(initial=self.get_initial())
-        return render(request, self.template_name, {'form': form, 'item': self.item})
+        formset = forms.ItemPackagingVersionFormSet(instance=self.item)
+        # Forms separados:
+        current_forms = []
+        historic_forms = []
+        new_forms = []
+
+        for form in formset.forms:
+            if form.instance.pk:
+                if form.instance.valid_to:
+                    historic_forms.append(form)
+                else:
+                    current_forms.append(form)
+            else:
+                new_forms.append(form)
+
+        # Form vazio manual
+        empty_form = forms.ItemPackagingVersionFormSet(instance=self.item).empty_form
+
+        context = {
+            'item': self.item,
+            'formset': formset,
+            'current_forms': current_forms,
+            'historic_forms': historic_forms,
+            'new_forms': new_forms,
+            'empty_form': empty_form,
+        }
+        return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
-        form = forms.ItemPackagingVersionForm(request.POST)
-        if form.is_valid():
+        formset = forms.ItemPackagingVersionFormSet(request.POST, instance=self.item)
+        if formset.is_valid():
             now = timezone.now()
-            current = self.item.current_packaging_version()
+            current = self.item.current_packaging_version
             if current:
                 current.valid_to = now
                 current.save()
-            pkg = form.save(commit=False)
-            pkg.item = self.item
-            pkg.valid_from = now
-            pkg.save()
+
+            instances = formset.save(commit=False)
+            for inst in instances:
+                inst.item = self.item
+                if not inst.valid_from:
+                    inst.valid_from = now
+                inst.save()
+
+            formset.save_m2m()
 
             for f in models.ItemPackagingVersion.PACKAGING_FIELDS:
-                setattr(self.item, f, getattr(pkg, f))
+                setattr(self.item, f, getattr(instances[-1], f))
             self.item.save()
 
             return redirect('inventory:item-edit', pk=self.item.pk)
 
-        return render(request, self.template_name, {'form': form, 'item': self.item})
+        return render(request, self.template_name, {
+            'formset': formset,
+            'item': self.item
+        })

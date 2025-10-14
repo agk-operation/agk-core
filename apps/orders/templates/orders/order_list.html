@@ -8,11 +8,12 @@ Vendas
 {% block content %}
 
 <div class="row mb-3">
-    <div class="col-12">
-        <a href="{% url 'orders:order-add' %}" class="btn btn-success btn-sm float-end">
-            <i class="bi bi-plus-lg"></i> New Order
-        </a>
-    </div>
+  <div class="col-12 d-flex align-items-center justify-content-between">
+    <h5 class="display-6 mb-0">Orders</h5>
+    <a href="{% url 'orders:order-add' %}" class="btn btn-success btn-sm">
+      <i class="bi bi-plus-lg"></i> New Order
+    </a>
+  </div>
 </div>
 
 <!-- Filtro avançado componentizado -->

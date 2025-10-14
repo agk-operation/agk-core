@@ -1,0 +1,46 @@
+<form method="get" action="{% url 'orders:order-list' %}">
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+
+                <!-- Company -->
+                <div class="col-md-3">
+                    <label for="company" class="form-label">Companhia</label>
+                    <select class="form-select" name="company" id="company">
+                        <option value="" {% if not request.GET.company %} selected {% endif %}>Todas</option>
+                        {% for company in companies %}
+                            <option value="{{ company.id }}" {% if selected_company == company.id %} selected {% endif %}>{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Datas -->
+                <div class="col-md-2">
+                    <label for="start_date" class="form-label">Data inicial</label>
+                    <input type="date" class="form-control" name="start_date" id="start_date"
+                           value="{{ request.GET.start_date }}">
+                </div>
+
+                <div class="col-md-2">
+                    <label for="end_date" class="form-label">Data final</label>
+                    <input type="date" class="form-control" name="end_date" id="end_date"
+                           value="{{ request.GET.end_date }}">
+                </div>
+
+                <!-- Busca -->
+                <div class="col-md-3">
+                    <label for="search" class="form-label">Busca</label>
+                    <input type="text" class="form-control" name="search" id="search"
+                           placeholder="ID, Cliente..." value="{{ request.GET.search }}">
+                </div>
+
+                <!-- Botão -->
+                <div class="col-md-1 d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>

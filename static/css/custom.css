@@ -73,3 +73,7 @@
     color: inherit;
     box-shadow: none;
   }
+
+  .border-purple {
+  border-color: #6f42c1 !important;
+}

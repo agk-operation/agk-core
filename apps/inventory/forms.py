@@ -60,13 +60,13 @@ class PackagingVersionForm(forms.ModelForm):
         model = models.ItemPackagingVersion
         fields = models.ItemPackagingVersion.PACKAGING_FIELDS + ['valid_from','valid_to']
         widgets = {
-            **{ fld: forms.NumberInput(attrs={'class':'form-control-sm','step':'0.0001'}) 
+            **{ fld: forms.NumberInput(attrs={'class':'form-control form-control-sm','step':'0.0001'}) 
                 for fld in models.ItemPackagingVersion.PACKAGING_FIELDS },
             'valid_from': forms.DateTimeInput(
-                attrs={'type':'datetime-local','class':'form-control-sm'}
+                attrs={'type':'datetime-local','class':'form-control form-control-sm'}
             ),
-            'valid_to':   forms.DateTimeInput(
-                attrs={'type':'datetime-local','class':'form-control-sm'}
+            'valid_to': forms.DateTimeInput(
+                attrs={'type':'datetime-local','class':'form-control form-control-sm'}
             ),
         }
 
@@ -82,7 +82,7 @@ class PackagingVersionForm(forms.ModelForm):
             ),
             HTML('<hr>'),
             # =====→ Dimensões (cm) =====
-            HTML('<h5 class="mt-3">Dimensões (cm)</h5>'),
+            HTML('<h5 class="mt-3">Dimensions (cm)</h5>'),
             Row(
                 Column(
                     AppendedText('packing_lengh', 'cm'),
@@ -99,7 +99,7 @@ class PackagingVersionForm(forms.ModelForm):
             ),
             HTML('<hr>'),
             # =====→ Peso (kg) =====
-            HTML('<h5 class="mt-3">Peso (kg)</h5>'),
+            HTML('<h5 class="mt-3">Weight (kg)</h5>'),
             Row(
                 Column(
                     AppendedText('net_weight', 'kg'),
@@ -110,7 +110,6 @@ class PackagingVersionForm(forms.ModelForm):
                     css_class='col-md-6'
                 ),
             ),
-            HTML('<hr>'),
             # =====→ Embalagem individual =====
             Row(
                 Column(
@@ -122,7 +121,6 @@ class PackagingVersionForm(forms.ModelForm):
                     css_class='col-md-6'
                 ),
             ),
-            HTML('<hr>'),
         )
         # Preenche valid_from no blank form (GET)
         if not self.is_bound and not self.instance.pk:
@@ -154,7 +152,7 @@ ItemPackagingVersionFormSet = inlineformset_factory(
     models.ItemPackagingVersion,
     form=PackagingVersionForm,
     formset=PackagingVersionFormSet,
-    extra=1,
+    extra=0,
     can_delete=True,
 )
 

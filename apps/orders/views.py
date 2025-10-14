@@ -10,7 +10,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import ListView, CreateView, UpdateView, View, DeleteView
 from django.forms import HiddenInput, inlineformset_factory, modelformset_factory
-from django.db.models import Sum, F, DecimalField
+from django.db.models import Sum, F, DecimalField, Q
 from django.db import transaction
 from apps.inventory.models import Item, ItemPackagingVersion
 from apps.pricing.models import CustomerItemMargin
@@ -33,6 +33,7 @@ class OrderListView(ListView):
         status_id = self.request.GET.get('status')
         start_date = self.request.GET.get('start_date')
         end_date = self.request.GET.get('end_date')
+        search = self.request.GET.get('search')
         if customer:
             queryset = queryset.filter(customer__name__icontains=customer)
         
@@ -52,6 +53,13 @@ class OrderListView(ListView):
             if parsed_end:
                 queryset = queryset.filter(created_at__date__lte=parsed_end)
 
+        if search:
+            search = search.strip()
+    
+            filters = Q(customer__name__icontains=search)
+            if search.isdigit():
+                filters |= Q(id=int(search))
+            queryset = queryset.filter(filters)
            
         return queryset
 
@@ -693,13 +701,13 @@ class AllBatchListView(ListView):
      - total_value = soma(quantity * item.price) de cada BatchItem
     """
     model               = OrderBatch
-    template_name       = 'orders/batch_list.html'
+    template_name       = 'batches/batch_list.html'
     context_object_name = 'batches'
     paginate_by         = 20
 
     def get_queryset(self):
         # Anota cada batch com total financeiro
-        qs = (
+        queryset = (
             OrderBatch.objects
             .select_related('order__customer')
             .annotate(
@@ -710,7 +718,32 @@ class AllBatchListView(ListView):
                 )
             )
         )
-        return qs
+        customer = self.request.GET.get('customer')
+        company_id = self.request.GET.get('company')
+        status_id = self.request.GET.get('status')
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+        if customer:
+            queryset = queryset.filter(customer__name__icontains=customer)
+        
+        if company_id:
+            queryset = queryset.filter(company_id=company_id)
+
+        if status_id:
+            queryset = queryset.filter(order_status_id=status_id)
+
+        if start_date:
+            parsed_start = parse_date(start_date)
+            if parsed_start:
+                queryset = queryset.filter(created_at__date__gte=parsed_start)
+
+        if start_date:
+            parsed_end = parse_date(end_date)
+            if parsed_end:
+                queryset = queryset.filter(created_at__date__lte=parsed_end)
+
+           
+        return queryset
 
 
 class OrderBatchListView(ListView):
@@ -730,7 +763,7 @@ class OrderBatchListView(ListView):
 
 
 class OrderBatchCreateView(View):
-    template_name = 'orders/batch_create.html'
+    template_name = 'batches/batch_create.html'
     # instanciamos a fábrica de formset aqui pra não repetir
 
     def dispatch(self, request, *args, **kwargs):
@@ -824,7 +857,7 @@ class OrderBatchCreateView(View):
     
 
 class OrderBatchDetailView(View):
-    template_name = 'orders/batch_detail.html'
+    template_name = 'batches/batch_detail.html'
 
     def dispatch(self, request, *args, **kwargs):
         self.batch = get_object_or_404(
@@ -883,7 +916,7 @@ class OrderBatchDetailView(View):
 
 class OrderBatchDeleteView(DeleteView):
     model = OrderBatch
-    template_name = 'orders/order_batch_delete.html'
+    template_name = 'batches/order_batch_delete.html'
     context_object_name = 'batch'
 
     # 1) Garante que só vamos deletar o batch que pertence à Order correta

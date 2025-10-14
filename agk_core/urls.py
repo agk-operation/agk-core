@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -12,6 +13,9 @@ urlpatterns = [
     path('orders/', include('apps.orders.urls')), 
     path('finance/', include('apps.finance.urls')),
     path('shipments/', include('apps.shipments.urls')),
+
+    path('login/', auth_views.LoginView.as_view(), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
 ] 
 
 if settings.DEBUG:

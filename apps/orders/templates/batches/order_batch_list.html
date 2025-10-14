@@ -2,11 +2,15 @@
 {% block title %}Lotes da Ordem #{{ order.pk }}{% endblock %}
 
 {% block content %}
+
 <div class="container mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>Lotes da Ordem #{{ order.pk }}</h3>
     <a href="{% url 'orders:batch-add' order.pk %}" class="btn btn-primary">+ Novo Lote</a>
   </div>
+
+  <!-- Filtro avançado componentizado -->
+  {% include 'batches/components/_filter.html' %}
 
   {% if batches %}
   <div class="table-responsive mt-3">

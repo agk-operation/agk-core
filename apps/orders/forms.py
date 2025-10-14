@@ -286,7 +286,7 @@ BatchItemFormSet = inlineformset_factory(
     OrderBatch, BatchItem,
     form=BatchItemForm,
     formset=BaseBatchItemFormSet,
-    extra=0,
+    extra=1,
     can_delete=True
 )
 

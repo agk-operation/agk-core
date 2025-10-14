@@ -20,7 +20,7 @@
             </a>
           </li>
           <li>
-            <a href="{% url 'shipments:pre_shipment-list' %}" class="nav-link px-0 align-middle">
+            <a href="{% url 'shipments:shipment-list' %}" class="nav-link px-0 align-middle">
                 <i class="bi bi-box-seam-fill"></i>
               <span class="ms-1">Shipments</span>
             </a>
@@ -60,6 +60,17 @@
                 <i class="bi bi-cash-coin fs-4"></i>
               <span class="ms-1">Pagamentos</span>
             </a>
+          </li>
+          <li class="nav-item">
+            {% if user.is_authenticated %}
+              <form action="{% url 'logout' %}" method="post" id="logout-form" class="nav-link px-0 align-middle">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link text-decoration-none text-reset nav-link px-0 align-middle">
+                  <i class="bi bi-box-arrow-right fs-4 align-middle"></i>
+                  <span class="ms-1 align-middle">Sair</span>
+                </button>
+              </form>
+            {% endif %}
           </li>
         </ul>
       </div>

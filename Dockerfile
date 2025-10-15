@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-bookworm
 
 WORKDIR /agk-core
 
@@ -10,11 +10,7 @@ RUN apt update && apt -y install cron && apt -y install nano
 COPY . .
 
 RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-
-COPY ./cron /etc/cron.d/cron
-RUN chmod 0644 /etc/cron.d/cron
-RUN crontab /etc/cron.d/cron
+RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000
 

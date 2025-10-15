@@ -32,7 +32,7 @@ DEBUG = True
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'unsafe-default-key')#"django-insecure-*vn%jzo+*nq^edg5)d099d_n4_h58dym9)_tzt-q)xwev9m=*="
+SECRET_KEY = os.getenv('SECRET_KEY', 'unsafe-default-key')#""
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'

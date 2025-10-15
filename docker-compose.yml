@@ -19,7 +19,7 @@ services:
         environment:
             - POSTGRES_USER=postgres
             - POSTGRES_PASSWORD=postgres
-            - POSTGRES_DB=sge
+            - POSTGRES_DB=agk_core
 
 volumes:
     postgres_data:

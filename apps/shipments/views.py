@@ -3,6 +3,10 @@ from django.urls import reverse
 from django.views import View, generic
 from django.db import transaction
 from django.http import Http404
+from django.contrib import messages
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils.safestring import mark_safe
 from agk_core import metrics
 from .models import Shipment, Stage, ShipmentStage
 from .forms  import ShipmentForm, ShipmentBatchFormSet, ShipmentStageFormSet, ShipmentStageForm, FinalShipmentForm
@@ -25,8 +29,8 @@ class PreShipmentListView(generic.ListView):
 
 
 class PreShipmentCreateView(View):
-    template_name = 'shipments/shipment_form.html'  # unificado
-
+    template_name = 'shipments/shipment_form.html'
+    
     def get(self, request):
         # Form principal (pré)
         form = ShipmentForm()
@@ -99,8 +103,6 @@ class PreShipmentCreateView(View):
         if form.is_valid() and batch_fs.is_valid() and forms_valid:
             with transaction.atomic():
                 shipment = form.save(commit=False)
-
-                # Persiste campos dinâmicos mapeados dos stages para o shipment
                 for form_stage in stage_form_objects:
                     stage = form_stage.instance.stage
                     for cfg in stage.field_configs.all():
@@ -237,9 +239,22 @@ class PreShipmentUpdateView(View):
                     for ss in shp.stages.filter(stage__workflow=Stage.WORKFLOW_PRELOADING)
                 ):
                     shp.status = Shipment.STATUS_READY
-                shp.save()
-
-            return redirect('shipments:pre_shipment-edit', pk=shipment.pk)
+                    shp.save()
+                    messages.success(
+                        self.request,
+                        mark_safe(
+                            "A fase pré foi concluída com sucesso. "
+                            "Deseja continuar com a edição da fase final ou retornar à lista?"
+                            "<br><a href='{}' class='btn btn-primary mt-2'>Editar fase final</a>"
+                            " <a href='{}' class='btn btn-secondary mt-2'>Voltar à lista</a>".format(
+                                reverse('shipments:shipment-stages', args=[shipment.pk]),
+                                reverse('shipments:shipment-list')
+                            )
+                        )
+                    )
+                    return redirect('shipments:shipment-ready-confirmation', pk=shp.pk)
+                
+                return redirect('shipments:pre_shipment-edit', pk=shipment.pk)
 
         ctx = {
             'phase': 'pre',
@@ -267,6 +282,14 @@ class PreShipmentDeleteView(View):
         return redirect('shipments:pre_shipment-list')
 
 
+class ShipmentReadyConfirmationView(LoginRequiredMixin, TemplateView):
+    template_name = 'shipments/shipment_ready_confirmation.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        shipment = get_object_or_404(Shipment, pk=self.kwargs['pk'])
+        context['shipment'] = shipment
+        return context
 # ───────────────────────────────────────────────────────────
 #  Views para a fase de SHIPMENT FINAL (status = RDY ou SHP)
 # ───────────────────────────────────────────────────────────
@@ -333,7 +356,7 @@ class ShipmentUpdateView(View):
             'read_only': False,
             'delete_url': None,
             'shipment_metrics': metrics.get_shipment_metrics(shipment.pk),
-            #'cancel_url': reverse('shipments:shipment-detail', args=[shipment.pk]),
+            'cancel_url': reverse('shipments:shipment-list'),
         }
         return render(request, self.template_name, ctx)
 

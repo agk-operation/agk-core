@@ -11,7 +11,7 @@
 <div class="container py-5">
 
   {# Cabeçalho unificado #}
-  {% include "shipments/_header.html" with object=object status_display=object.get_status_display delete_url=delete_url %}
+  {% include "shipments/components/_header.html" with object=object status_display=object.get_status_display delete_url=delete_url %}
 
   <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
@@ -38,24 +38,24 @@
 
     {# Cards de resumo quando existir objeto #}
     {% if object.pk %}
-      {% include "shipments/_summary_cards.html" with object=object shipment_metrics=shipment_metrics %}
+      {% include "shipments/components/_summary_cards.html" with object=object shipment_metrics=shipment_metrics %}
     {% endif %}
 
     {# Batches (somente no pré; opcional mostrar no final via flag) #}
     {% if show_batches %}
-      {% include "shipments/_batches_formset.html" with batch_fs=batch_fs read_only=read_only %}
+      {% include "shipments/components/_batches_formset.html" with batch_fs=batch_fs read_only=read_only %}
     {% endif %}
 
     {# Checklist: podemos mostrar um ou dois accordions conforme a fase #}
     {% if phase == 'final' %}
       <h5 class="mt-5">Checklist Final</h5>
-      {% include "shipments/_stages_section.html" with forms=stages_fs.forms workflow_code='SHP' accordion_id='finalStagesAccordion' %}
+      {% include "shipments/components/_stages_section.html" with forms=stages_fs.forms workflow_code='SHP' accordion_id='finalStagesAccordion' %}
       <h5 class="mt-4">Checklist Pré-Embarque</h5>
-      {% include "shipments/_stages_section.html" with forms=stages_fs.forms workflow_code='PRE' accordion_id='preStagesAccordion' %}
+      {% include "shipments/components/_stages_section.html" with forms=stages_fs.forms workflow_code='PRE' accordion_id='preStagesAccordion' %}
     {% else %}
       <h5>CheckList</h5>
       {# Pré mostra conjunto único conforme seu pre_shipment_form atual (usando a mesma ideia de fields) #}
-      {% include "shipments/_stages_section.html" with forms=stages_forms workflow_code=None accordion_id='preOnlyAccordion' pre_layout=True read_only=read_only %}
+      {% include "shipments/components/_stages_section.html" with forms=stages_forms workflow_code=None accordion_id='preOnlyAccordion' pre_layout=True read_only=read_only %}
     {% endif %}
 
     <div class="d-flex justify-content-end mt-4">

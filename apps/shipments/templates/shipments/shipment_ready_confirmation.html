@@ -1,0 +1,25 @@
+{# templates/shipments/shipment_ready_confirmation.html #}
+{% extends 'base.html' %}
+{% block title %}Fase Pré Concluída{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="alert alert-success text-center">
+    <h5 class="mb-3">
+      <i class="fas fa-check-circle text-success me-2"></i>
+      Fase pré concluída com sucesso!
+    </h5>
+    <p class="mb-4">
+      O Shipment #{{ shipment.pk }} está pronto para iniciar a fase final.
+    </p>
+    <div class="d-flex justify-content-center gap-3">
+      <a href="{% url 'shipments:shipment-stages' shipment.pk %}" class="btn btn-primary">
+        Continuar para fase final
+      </a>
+      <a href="{% url 'shipments:shipment-list' %}" class="btn btn-secondary">
+        Voltar à lista
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

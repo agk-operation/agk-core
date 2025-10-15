@@ -6,7 +6,18 @@ from django.db import transaction
 from django.utils import timezone
 from . import models
 from . import forms
+from . import default_data
 
+CHOICE_FIELD_DEFAULTS = {
+    'category':    (models.Category,    default_data.DEFAULT_CATEGORIES),
+    'supplier':    (models.Supplier,    default_data.DEFAULT_SUPPLIERS),
+    'subcategory': (models.Subcategory, default_data.DEFAULT_SUBCATEGORIES),
+    'project':     (models.Project,     default_data.DEFAULT_PROJECTS),
+    'supplier_chain': (models.SupplierChain, default_data.DEFAULT_SUPPLIER_CHAINS),
+    'chain':       (models.Chain,      default_data.DEFAULT_CHAINS),
+    'brand_manufacturer': (models.BrandManufacturer, default_data.DEFAULT_BRAND_MANUFACTURERS),
+    'ncm':         (models.Ncm,        default_data.DEFAULT_NCMS),
+    }
 
 class ItemListView(ListView):
     model = models.Item
@@ -35,6 +46,11 @@ class ItemCreateUpdateView(View):
         form = forms.ItemForm(instance=item)
         fs_app  = forms.ItemModelApplicationFormSet(instance=item, prefix=APP_FS_PREFIX)
         fs_pack = forms.ItemPackagingVersionFormSet(instance=item, prefix=PACK_FS_PREFIX)
+
+        for field_name, (model, defaults) in CHOICE_FIELD_DEFAULTS.items():
+            if not model.objects.exists():
+                choices = [(value, value) for value in defaults]
+                form.fields[field_name].choices = choices
 
         # Desabilita ONLY os campos dos forms históricos (pk existente)
         if item.pk:

@@ -39,7 +39,6 @@ class ShipmentForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        # garante que todos os campos principais estejam preenchidos
         missing = [f for f in ('pod','signer','leader','customer_reference') 
                    if not cleaned.get(f)]
         if missing:

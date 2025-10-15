@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load status_filters %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3>{% if pre_loading %}Pre-Shipments</h3>
@@ -8,6 +9,10 @@
   {% else %}Shipments</h3>{% endif %}
   
 </div>
+
+<!-- Filtro avançado componentizado -->
+{% include 'shipments/components/_filter.html' %}
+
 <table class="table table-striped">
   <thead>
     <tr>
@@ -21,7 +26,7 @@
   </thead>
   <tbody>
     {% for s in object_list %}
-      <tr>
+      <tr class="{{ s.status|status_row_class }}">
         <td>{{ s.pk }}</td>
         <td>{{ s.created_at|date:"d/m/Y H:i" }}</td>
         <td>{{ s.get_status_display }}</td>

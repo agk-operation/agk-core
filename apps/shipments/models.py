@@ -16,14 +16,12 @@ class Shipment(models.Model):
     updated_at  = models.DateTimeField(auto_now=True)
     status      = models.CharField(max_length=3, choices=STATUS_CHOICES, default=STATUS_PRELOADING)
 
-    # ── campos PRINCIPAIS ─────────────────────────────
     pol = models.CharField("Port of Loading", max_length=100, blank=True)  
     pod = models.CharField("Port of Destination", max_length=100, blank=True) 
     signer = models.CharField("Signer", max_length=100, blank=True)
     leader = models.CharField("Leader", max_length=100, blank=True)
     customer_reference = models.CharField("Customer Ref.", max_length=100, blank=True)
 
-    # ── campos de informações adicionas ao decorrer do processo
     loading_date = models.DateTimeField(null=True)
     shipping_date = models.DateField(null=True, blank=True)
     cons_point = models.CharField("Consolidation Point", max_length=100, blank=True)
@@ -53,8 +51,6 @@ class Shipment(models.Model):
     eta_destination = models.DateField("E.T.A", null=True, blank=True)
     ata_destination = models.DateField("A.T.A", null=True, blank=True)
      
-
-    # relação N:N com OrderBatch
     batches = models.ManyToManyField(
         OrderBatch,
         through='ShipmentBatch',
@@ -72,6 +68,18 @@ class Shipment(models.Model):
     @property
     def is_shipped(self): 
         return self.status == self.STATUS_SHIPPED
+    
+    def is_pre_phase_completed(self):
+        required_fields = [
+            self.cons_point,
+            self.city,
+            self.pol,
+            self.shp_doc,
+            self.origin_agent,
+            self.destination_agent,
+            self.booking,
+        ]
+        return all(required_fields)
 
     class Meta:
         ordering = ['-created_at']

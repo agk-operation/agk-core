@@ -1,17 +1,26 @@
+# Usa imagem estável e compatível
 FROM python:3.13-bookworm
 
+# Define diretório de trabalho
 WORKDIR /agk-core
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# Variáveis de ambiente (formato moderno)
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-RUN apt update && apt -y install cron && apt -y install nano
+# Instala dependências do sistema
+RUN apt update && apt install -y cron nano && rm -rf /var/lib/apt/lists/*
 
+# Copia apenas requirements.txt primeiro (para cache de pip)
+COPY requirements.txt .
+
+# Atualiza pip e instala dependências do projeto
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+
+# Agora copia o resto do projeto (código e settings.py)
 COPY . .
 
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
-
+# Expõe porta e define comando de inicialização
 EXPOSE 8000
 
-CMD cron ; python manage.py migrate && python manage.py runserver 0.0.0.0:8000
+CMD service cron start && python manage.py migrate && python manage.py runserver 0.0.0.0:8000

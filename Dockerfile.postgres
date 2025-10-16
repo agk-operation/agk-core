@@ -1,0 +1,8 @@
+# Base image
+FROM postgres:15
+
+# Copia seu arquivo customizado de configuração
+COPY ./postgresql.conf /etc/postgresql/postgresql.conf
+
+# Define a execução do postgres com seu arquivo de config
+CMD ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]

@@ -23,6 +23,7 @@ services:
             - "5432"
         volumes:
             - postgres_data:/var/lib/postgresql/data/
+            - ./docker-postgres.conf:/var/lib/postgresql/data/postgresql.conf
             - ./certs/server.crt:/var/lib/postgresql/server.crt:ro
             - ./certs/server.key:/var/lib/postgresql/server.key:ro
         networks:

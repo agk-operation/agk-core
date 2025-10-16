@@ -5,6 +5,20 @@
 {% block title %}{{ object.pk|yesno:"Edit,Add New" }} Item{% endblock %}
 
 {% block content %}
+{% comment %} <div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="display-6 m-0">{{ object.pk|yesno:"Edit,Add New" }} Item</h3>
+    
+    <button id="populate-defaults-btn" class="btn btn-outline-primary btn-sm">
+      <i class="fas fa-magic"></i> Popular Dados Padrão
+    </button>
+  </div>
+  
+  <form method="post" novalidate>
+    {% csrf_token %}
+    ...
+  </form>
+</div> {% endcomment %}
 <div class="container mt-4">
   <h3 class="display-6">{{ object.pk|yesno:"Edit,Add New" }} Item</h3>
 
@@ -366,7 +380,7 @@
     'category', 'subcategory', 'project',
     'supplier', 'supplier_chain', 'chain',
     'ncm', 'brand_manufacturer', 'currency',
-    'group', 'version'
+    'group', 'version',
   ], '/inventory', {
     brand_manufacturer: 'brandmanufacturer',
     supplier_chain: 'supplierchain'
@@ -441,5 +455,74 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 });
 </script>
+{{ block.super }} <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const populateBtn = document.getElementById('populate-defaults-btn');
 
+      // Função para pegar o token CSRF do formulário
+      function getCsrfToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+      }
+
+      // Função para atualizar um dropdown com novos dados
+      function updateDropdown(selectElement, data) {
+        if (!selectElement) return;
+
+        // Guarda o valor selecionado atualmente, se houver
+        const selectedValue = selectElement.value;
+
+        // Limpa as opções existentes (exceto a primeira, que é "----")
+        while (selectElement.options.length > 1) {
+          selectElement.remove(1);
+        }
+
+        // Adiciona as novas opções
+        data.forEach(item => {
+          const option = new Option(item.name, item.id);
+          selectElement.add(option);
+        });
+
+        // Tenta restaurar a seleção anterior
+        selectElement.value = selectedValue;
+      }
+
+      populateBtn.addEventListener('click', function() {
+        // Desabilita o botão para evitar múltiplos cliques
+        populateBtn.disabled = true;
+        populateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Populando...';
+
+        fetch("{% url 'inventory:populate-defaults' %}", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken() // Essencial para requisições POST no Django!
+          },
+        })
+        .then(response => response.json())
+        .then(result => {
+          console.log(result.message);
+          
+          if (result.status === 'success') {
+            // Itera sobre os dados recebidos e atualiza cada dropdown
+            for (const [fieldName, data] of Object.entries(result.data)) {
+              const selectElement = document.querySelector(`[name=${fieldName}]`);
+              updateDropdown(selectElement, data);
+            }
+            alert('Dropdowns populados e atualizados com sucesso!');
+          } else {
+            alert('Ocorreu um erro ao popular os dados.');
+          }
+        })
+        .catch(error => {
+          console.error('Erro na requisição:', error);
+          alert('Erro de conexão. Verifique o console para mais detalhes.');
+        })
+        .finally(() => {
+          // Reabilita o botão
+          populateBtn.disabled = false;
+          populateBtn.innerHTML = '<i class="fas fa-magic"></i> Popular Dados Padrão';
+        });
+      });
+    });
+  </script>
 {% endblock %}

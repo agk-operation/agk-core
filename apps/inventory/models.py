@@ -83,6 +83,24 @@ class ModelApplication(models.Model):
     def __str__(self):
         return self.name
     
+class Group(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+class Version(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name    
+    
 
 class Item(models.Model):
     p_code = models.CharField(max_length=50, unique=True)
@@ -95,6 +113,8 @@ class Item(models.Model):
     name = models.CharField(max_length=200)
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT)
     category = models.ForeignKey(Category, on_delete=models.PROTECT)
+    group = models.ForeignKey(Group, on_delete=models.PROTECT, null=True, blank=True)
+    version = models.ForeignKey(Version, on_delete=models.PROTECT, null=True, blank=True)
     subcategory = models.ForeignKey(Subcategory, on_delete=models.PROTECT)
     project = models.ForeignKey(Project, on_delete=models.PROTECT)
     supplier_chain = models.ForeignKey(SupplierChain, on_delete=models.PROTECT)

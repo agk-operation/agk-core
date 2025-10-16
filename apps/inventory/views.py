@@ -27,6 +27,10 @@ CREATE_URLS = {
     'brand_manufacturer': 'inventory:brandmanufacturer-create',
     'model_application':  'inventory:modelapplication-create',
     'currency':           'inventory:currency-create',
+    'group':              'inventory:group-create',
+    'version':            'inventory:version-create',
+    'supplier':          'inventory:supplier-create',
+    
 }
 APP_FS_PREFIX   = 'itemmodelapplication_set'
 PACK_FS_PREFIX  = 'pack'
@@ -134,7 +138,8 @@ class ItemDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
 RELATED_MODELS = [
     'Category', 'Subcategory', 'Project', 
     'SupplierChain', 'Chain', 'Ncm',
-    'BrandManufacturer', 'ModelApplication', 'Currency'
+    'BrandManufacturer', 'ModelApplication', 'Currency',
+    'Group', 'Version', 'Supplier',
 ]
 
 for model_name in RELATED_MODELS:

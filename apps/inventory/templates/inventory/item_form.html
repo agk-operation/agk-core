@@ -25,7 +25,7 @@
       <div class="card-body">
         <div class="row g-3">
           {% for field in form %}
-            {% if field.name in 'name category supplier subcategory project supplier_chain chain' %}
+            {% if field.name in 'name category supplier subcategory project supplier_chain chain group version' %}
               <div class="col-md-6">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 <div class="d-flex align-items-center gap-2">
@@ -365,7 +365,8 @@
   setupEditLinks([
     'category', 'subcategory', 'project',
     'supplier', 'supplier_chain', 'chain',
-    'ncm', 'brand_manufacturer', 'currency'
+    'ncm', 'brand_manufacturer', 'currency',
+    'group', 'version'
   ], '/inventory', {
     brand_manufacturer: 'brandmanufacturer',
     supplier_chain: 'supplierchain'

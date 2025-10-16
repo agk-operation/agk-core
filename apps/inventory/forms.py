@@ -32,6 +32,8 @@ class ItemForm(forms.ModelForm):
             'brand_manufacturer': forms.Select(attrs={'class': 'form-select'}),
             'currency': forms.Select(attrs={'class': 'form-select'}),
             'moq': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'group': forms.Select(attrs={'class': 'form-select'}),
+            'version': forms.Select(attrs={'class': 'form-select'}),
         }
 
     
@@ -159,7 +161,8 @@ ItemPackagingVersionFormSet = inlineformset_factory(
 RELATED_MODELS = [
     'Category', 'Subcategory', 'Project',
     'SupplierChain', 'Chain', 'Ncm',
-    'BrandManufacturer', 'ModelApplication', 'Currency'
+    'BrandManufacturer', 'ModelApplication', 'Currency',
+    'Group', 'Version', 'Supplier',
 ]
 
 for model_name in RELATED_MODELS:

@@ -3,5 +3,6 @@ FROM postgres:15
 # Copia o arquivo diretamente da raiz do projeto
 COPY ./postgresql.conf /etc/postgresql/postgresql.conf
 
+RUN apt update && apt install -y cron postgresql-client nano 
 # Define a execução do postgres com o arquivo customizado
 CMD ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]

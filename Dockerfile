@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Instala dependências do sistema
-RUN apt update && apt install -y cron nano && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y cron postgresql-client nano && rm -rf /var/lib/apt/lists/*
 
 # Copia apenas requirements.txt primeiro (para cache de pip)
 COPY requirements.txt .

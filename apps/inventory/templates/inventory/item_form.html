@@ -5,7 +5,7 @@
 {% block title %}{{ object.pk|yesno:"Edit,Add New" }} Item{% endblock %}
 
 {% block content %}
-{% comment %} <div class="container mt-4">
+<div class="container mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="display-6 m-0">{{ object.pk|yesno:"Edit,Add New" }} Item</h3>
     
@@ -18,7 +18,7 @@
     {% csrf_token %}
     ...
   </form>
-</div> {% endcomment %}
+</div>
 <div class="container mt-4">
   <h3 class="display-6">{{ object.pk|yesno:"Edit,Add New" }} Item</h3>
 
@@ -39,7 +39,7 @@
       <div class="card-body">
         <div class="row g-3">
           {% for field in form %}
-            {% if field.name in 'name category supplier subcategory project supplier_chain chain group version' %}
+            {% if field.name in 'name category supplier subcategory project supplier_chain chain group version col_item application' %}
               <div class="col-md-6">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 <div class="d-flex align-items-center gap-2">
@@ -380,7 +380,7 @@
     'category', 'subcategory', 'project',
     'supplier', 'supplier_chain', 'chain',
     'ncm', 'brand_manufacturer', 'currency',
-    'group', 'version',
+    'group', 'version', 'col_item',
   ], '/inventory', {
     brand_manufacturer: 'brandmanufacturer',
     supplier_chain: 'supplierchain'
@@ -457,6 +457,53 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 {{ block.super }} <script>
     document.addEventListener('DOMContentLoaded', function() {
+
+// 1. Pegue as referências para todos os campos envolvidos
+      const groupSelect = document.getElementById('id_group');
+      const applicationSelect = document.getElementById('id_application'); // Usando Subcategory como "Model"
+      const supplierSelect = document.getElementById('id_supplier');
+      const itemSelect = document.getElementById('id_col_item'); // Assumindo que o nome do campo é 'col_item'
+      const versionSelect = document.getElementById('id_version');
+      const pCodeInput = document.getElementById('id_p_code');
+
+      // 2. Crie a função que atualiza o P code
+      function updatePCode() {
+        // Função auxiliar para pegar o TEXTO da opção selecionada, não o ID
+        const getSelectedText = (selectElement) => {
+          if (!selectElement || selectElement.value === "") {
+            return ""; // Retorna vazio se nada estiver selecionado
+          }
+          return selectElement.options[selectElement.selectedIndex].text;
+        };
+
+        // Pega o texto de cada dropdown
+        const groupVal = getSelectedText(groupSelect);
+        const modelVal = getSelectedText(applicationSelect); // Usando Subcategory
+        const supplierVal = getSelectedText(supplierSelect);
+        const itemVal = getSelectedText(itemSelect);
+        const versionVal = getSelectedText(versionSelect);
+
+        // Se todos os campos necessários estiverem preenchidos, monte o código
+        if (groupVal && modelVal && supplierVal && itemVal && versionVal) {
+          const generatedCode = `${groupVal}-${modelVal}${supplierVal}-${itemVal}${versionVal}`;
+          pCodeInput.value = generatedCode;
+        } else {
+           pCodeInput.value = ""; 
+        }
+      }
+
+      // 3. Adicione um "ouvinte" para cada dropdown
+      const fieldsToWatch = [groupSelect, applicationSelect, supplierSelect, itemSelect, versionSelect];
+      
+      fieldsToWatch.forEach(field => {
+        if (field) { // Garante que o campo existe na página
+          field.addEventListener('change', updatePCode);
+        }
+      });
+
+      // 4. Chame a função uma vez no início para popular o campo se for um formulário de edição
+      updatePCode();
+
       const populateBtn = document.getElementById('populate-defaults-btn');
 
       // Função para pegar o token CSRF do formulário

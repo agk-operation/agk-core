@@ -29,6 +29,8 @@ class PopulateDefaultsView(View):
         'Ncm':         (models.Ncm,         default_data.DEFAULT_NCMS),
         'Group':       (models.Group,       default_data.DEFAULT_GROUPS),
         'Version':     (models.Version,     default_data.DEFAULT_VERSIONS),
+        'Currency':    (models.Currency,    default_data.DEFAULT_CURRENCIES),
+        'ColItem':        (models.ColItem,        default_data.DEFAULT_ITEM_CODES),
     }
 
     def get_placeholder_for_fk(self, related_model):
@@ -55,7 +57,7 @@ class PopulateDefaultsView(View):
                     defaults = {}
                     # Itera sobre todos os campos do modelo
                     for field in Model._meta.get_fields():
-                        
+
                         if not field.concrete:
                             continue
 
@@ -117,6 +119,8 @@ CREATE_URLS = {
     'group':              'inventory:group-create',
     'version':            'inventory:version-create',
     'supplier':           'inventory:supplier-create',
+    'col_item':           'inventory:col_item-create',
+    'application':        'inventory:application-create',
     
 }
 APP_FS_PREFIX   = 'itemmodelapplication_set'
@@ -226,7 +230,7 @@ RELATED_MODELS = [
     'Category', 'Subcategory', 'Project', 
     'SupplierChain', 'Chain', 'Ncm',
     'BrandManufacturer', 'ModelApplication', 'Currency',
-    'Group', 'Version', 'Supplier',
+    'Group', 'Version', 'Supplier', 'ColItem', 'Application',
 ]
 
 for model_name in RELATED_MODELS:

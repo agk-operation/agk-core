@@ -17,7 +17,7 @@ for name in [
     'Category', 'Subcategory', 'Project', 
     'SupplierChain', 'Chain', 'Ncm',
     'BrandManufacturer', 'ModelApplication', 'Currency',
-    'Group', 'Version', 'Supplier',
+    'Group', 'Version', 'Supplier', 'ColItem', 'Application',
 ]:
     slug = re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
 

@@ -34,6 +34,8 @@ class ItemForm(forms.ModelForm):
             'moq': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'group': forms.Select(attrs={'class': 'form-select'}),
             'version': forms.Select(attrs={'class': 'form-select'}),
+            'col_item': forms.Select(attrs={'class': 'form-select'}),
+            'application': forms.Select(attrs={'class': 'form-select'}),
         }
 
     
@@ -162,7 +164,7 @@ RELATED_MODELS = [
     'Category', 'Subcategory', 'Project',
     'SupplierChain', 'Chain', 'Ncm',
     'BrandManufacturer', 'ModelApplication', 'Currency',
-    'Group', 'Version', 'Supplier',
+    'Group', 'Version', 'Supplier', 'ColItem', 'Application',
 ]
 
 for model_name in RELATED_MODELS:

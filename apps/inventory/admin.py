@@ -29,8 +29,8 @@ class ItemAdmin(admin.ModelAdmin):
 
     fieldsets = (
                 ('Basic Data', {
-                    'fields': ('name', 'group', 'version', 'category', 'subcategory', 
-                               'project', 'supplier', 'supplier_chain', 'chain')
+                    'fields': ('name', 'group', 'ColItem', 'version', 'category', 'subcategory', 
+                               'project', 'supplier', 'supplier_chain', 'chain', 'application',)
                 }),
                 ('Item Specifications' , {
                     'fields' : ('brand_manufacturer', 'ncm')
@@ -110,5 +110,15 @@ class GroupAdmin(admin.ModelAdmin):
 
 @admin.register(models.Version)
 class VersionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)    
+
+@admin.register(models.ColItem)
+class ColItemAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+
+@admin.register(models.Application)
+class ApplicationAdmin(admin.ModelAdmin):
     list_display = ('name', 'description')
     search_fields = ('name',)    

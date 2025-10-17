@@ -91,6 +91,14 @@ class Group(models.Model):
 
     def __str__(self):
         return self.name
+class ColItem(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  
+
+    def __str__(self):
+        return self.name
 
 class Version(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -101,7 +109,17 @@ class Version(models.Model):
     def __str__(self):
         return self.name    
     
+class Application(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return self.name
+    
+
+    
 class Item(models.Model):
     p_code = models.CharField(max_length=50, unique=True)
     s_code = models.CharField(max_length=50)
@@ -114,11 +132,13 @@ class Item(models.Model):
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT)
     category = models.ForeignKey(Category, on_delete=models.PROTECT)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, null=True, blank=True)
+    col_item = models.ForeignKey(ColItem, on_delete=models.PROTECT, null=True, blank=True)
     version = models.ForeignKey(Version, on_delete=models.PROTECT, null=True, blank=True)
     subcategory = models.ForeignKey(Subcategory, on_delete=models.PROTECT)
     project = models.ForeignKey(Project, on_delete=models.PROTECT)
     supplier_chain = models.ForeignKey(SupplierChain, on_delete=models.PROTECT)
     brand_manufacturer = models.ForeignKey(BrandManufacturer, on_delete=models.PROTECT)
+    application = models.ForeignKey(Application, on_delete=models.PROTECT, null=True, blank=True)
 
     chain = models.ForeignKey(Chain, on_delete=models.PROTECT)
     ncm = models.ForeignKey(Ncm, on_delete=models.PROTECT)

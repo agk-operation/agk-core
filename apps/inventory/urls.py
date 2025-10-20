@@ -18,6 +18,8 @@ for name in [
     'SupplierChain', 'Chain', 'Ncm',
     'BrandManufacturer', 'ModelApplication', 'Currency',
     'Group', 'Version', 'Supplier', 'ColItem', 'Application',
+    'VersaoKitTrans', 'VersaoCuboRoda', 'VersaoCxDirecao', 'VersaoRaio', 'VersaoCorrente',
+
 ]:
     slug = re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
 

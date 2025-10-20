@@ -109,7 +109,7 @@ class Version(models.Model):
     def __str__(self):
         return self.name    
     
-class Application(models.Model):
+class Application(models.Model): # Esse é o Model da tabela GP
     name = models.CharField(max_length=50, unique=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -118,8 +118,49 @@ class Application(models.Model):
     def __str__(self):
         return self.name
     
+class VersaoKitTrans(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  
 
-    
+    def __str__(self):
+        return self.name
+
+class VersaoCuboRoda(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  
+
+    def __str__(self):
+        return self.name
+class VersaoCxDirecao(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    def __str__(self):
+        return self.name
+
+class VersaoRaio(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  
+
+    def __str__(self):
+        return self.name
+
+class VersaoCorrente(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  
+
+    def __str__(self):
+        return self.name
+    	 
 class Item(models.Model):
     p_code = models.CharField(max_length=50, unique=True)
     s_code = models.CharField(max_length=50)
@@ -139,6 +180,11 @@ class Item(models.Model):
     supplier_chain = models.ForeignKey(SupplierChain, on_delete=models.PROTECT)
     brand_manufacturer = models.ForeignKey(BrandManufacturer, on_delete=models.PROTECT)
     application = models.ForeignKey(Application, on_delete=models.PROTECT, null=True, blank=True)
+    versao_kit_trans = models.ForeignKey(VersaoKitTrans, on_delete=models.PROTECT, null=True, blank=True)
+    versao_cubo_roda = models.ForeignKey(VersaoCuboRoda, on_delete=models.PROTECT, null=True, blank=True)
+    versao_cx_direcao = models.ForeignKey(VersaoCxDirecao, on_delete=models.PROTECT, null=True, blank=True)
+    versao_raio = models.ForeignKey(VersaoRaio, on_delete=models.PROTECT, null=True, blank=True)
+    versao_corrente = models.ForeignKey(VersaoCorrente, on_delete=models.PROTECT, null=True, blank=True)
 
     chain = models.ForeignKey(Chain, on_delete=models.PROTECT)
     ncm = models.ForeignKey(Ncm, on_delete=models.PROTECT)

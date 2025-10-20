@@ -36,6 +36,11 @@ class ItemForm(forms.ModelForm):
             'version': forms.Select(attrs={'class': 'form-select'}),
             'col_item': forms.Select(attrs={'class': 'form-select'}),
             'application': forms.Select(attrs={'class': 'form-select'}),
+            'versao_kit_trans': forms.Select(attrs={'class': 'form-select'}),
+            'versao_cubo_roda': forms.Select(attrs={'class': 'form-select'}),
+            'versao_cx_direcao': forms.Select(attrs={'class': 'form-select'}),
+            'versao_raio': forms.Select(attrs={'class': 'form-select'}),
+            'versao_corrente': forms.Select(attrs={'class': 'form-select'}),
         }
 
     
@@ -165,6 +170,7 @@ RELATED_MODELS = [
     'SupplierChain', 'Chain', 'Ncm',
     'BrandManufacturer', 'ModelApplication', 'Currency',
     'Group', 'Version', 'Supplier', 'ColItem', 'Application',
+    'VersaoKitTrans', 'VersaoCuboRoda', 'VersaoCxDirecao', 'VersaoRaio', 'VersaoCorrente',
 ]
 
 for model_name in RELATED_MODELS:

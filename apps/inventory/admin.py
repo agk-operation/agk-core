@@ -30,7 +30,9 @@ class ItemAdmin(admin.ModelAdmin):
     fieldsets = (
                 ('Basic Data', {
                     'fields': ('name', 'group', 'ColItem', 'version', 'category', 'subcategory', 
-                               'project', 'supplier', 'supplier_chain', 'chain', 'application',)
+                               'project', 'supplier', 'supplier_chain', 'chain', 'application',
+                               'versao_kit_trans', 'versao_cubo_roda', 'versao_cx_direcao', 
+                                'versao_raio', 'versao_corrente',)
                 }),
                 ('Item Specifications' , {
                     'fields' : ('brand_manufacturer', 'ncm')
@@ -122,3 +124,29 @@ class ColItemAdmin(admin.ModelAdmin):
 class ApplicationAdmin(admin.ModelAdmin):
     list_display = ('name', 'description')
     search_fields = ('name',)    
+
+@admin.register(models.VersaoKitTrans)
+class VersaoKitTransAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+
+@admin.register(models.VersaoCuboRoda)
+class VersaoCuboRodaAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+
+@admin.register(models.VersaoCxDirecao)
+class VersaoCxDirecaoAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+
+@admin.register(models.VersaoRaio)
+class VersaoRaioAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+
+@admin.register(models.VersaoCorrente)
+class VersaoCorrenteAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+

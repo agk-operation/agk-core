@@ -446,6 +446,7 @@
       const raioInput = document.getElementById('id_versao_raio');
       const cxDirecaoInput = document.getElementById('id_versao_cx_direcao');
       const cuboRodaInput = document.getElementById('id_versao_cubo_roda');
+      const sCodeInput = document.getElementById('id_s_code');
 
       // 2. Função auxiliar getSelectedText (definir uma vez)
       const getSelectedText = (selectElement) => {
@@ -541,7 +542,64 @@
         } else if (pCodeInput) {
            pCodeInput.value = ""; 
         }
+        calculateSCode(); // Atualiza S_Code sempre que P_Code é atualizado
       }
+
+      function calculateSCode() {
+          const groupVal = getSelectedText(groupSelect);
+          const itemVal = getSelectedText(itemSelect); // D = col_item
+          const versionVal = getSelectedText(versionSelect); // E = version
+
+          // Pega os valores *calculados* dos campos de versão
+          const kitTransVal = kitTransInput?.value || ""; // BY
+          const correnteVal = correnteInput?.value || ""; // BZ
+          const raioVal = raioInput?.value || "";       // CA
+          const cxDirecaoVal = cxDirecaoInput?.value || ""; // CB
+          const cuboRodaVal = cuboRodaInput?.value || "";   // CD
+
+          // **ASSUMINDO CC:** Não temos um campo CC definido. 
+          // Vou usar a 'versionVal' (E) como fallback, similar aos grupos 010/045/050.
+          // Se CC for outra coisa, ajuste aqui.
+          const ccVal = versionVal; 
+
+          let generatedSCode = ""; // Valor padrão
+
+          if (groupVal && itemVal) { // Precisa pelo menos do grupo e item
+              switch (groupVal) {
+                  case "034":
+                      generatedSCode = `${groupVal}${itemVal}${cuboRodaVal}`; // A + D + CD
+                      break;
+                  case "001":
+                      generatedSCode = `${groupVal}${itemVal}${kitTransVal}`; // A + D + BY
+                      break;
+                  case "002":
+                      generatedSCode = `${groupVal}${itemVal}${correnteVal}`; // A + D + BZ
+                      break;
+                  case "025":
+                      generatedSCode = `${groupVal}${itemVal}${raioVal}`;     // A + D + CA
+                      break;
+                  case "013":
+                      generatedSCode = `${groupVal}${itemVal}${cxDirecaoVal}`; // A + D + CB
+                      break;
+                  case "004":
+                      generatedSCode = `${groupVal}${itemVal}${ccVal}`;        // A + D + CC (usando E como CC)
+                      break;
+                  case "010":
+                  case "045":
+                  case "050":
+                      generatedSCode = `${groupVal}${itemVal}${versionVal}`;   // A + D + E
+                      break;
+                  default:
+                      generatedSCode = `${groupVal}${itemVal}`;              // A + D (Default)
+                      break;
+              }
+          }
+
+           if (sCodeInput) {
+              sCodeInput.value = generatedSCode;
+            }
+           console.log("S Code calculado:", generatedSCode); // Log para depuração
+        }
 
       // 5. Função para atualizar Campos de Versão
       function updateVersionFields() {
@@ -562,6 +620,8 @@
         if (cxDirecaoInput) cxDirecaoInput.value = calculateCxDirecao(groupVal, versionVal, brandVal);
         if (cuboRodaInput) cuboRodaInput.value = calculateCuboRoda(groupVal, versionVal);
 
+        calculateSCode(); // Atualiza S_Code sempre que os campos de versão são atualizados
+        
         // Log para ver o resultado
         console.log("Valores definidos:", { 
             kitTrans: kitTransInput?.value, 

@@ -441,6 +441,7 @@
       const categorySelect = document.getElementById('id_category');
       const subcategorySelect = document.getElementById('id_subcategory');
       const brandSelect = document.getElementById('id_brand_manufacturer');
+      const projectSelect = document.getElementById('id_project');
       const kitTransInput = document.getElementById('id_versao_kit_trans');
       const correnteInput = document.getElementById('id_versao_corrente');
       const raioInput = document.getElementById('id_versao_raio');
@@ -509,10 +510,11 @@
         return "N/A"; // Retorna N/A se grupo não for 025
       }
 
-      function calculateCxDirecao(group, version, brand) {
+      function calculateCxDirecao(group, version, project) {
+        console.log("calculateCxDirecao chamado com:", { group, version, project }); // Log para depuração
         if (group === "013") {
           // Ajuste "SKF" se o texto exato for diferente no dropdown
-          if (brand === "SKF") return "CR"; 
+          if (project === "SKF") return "CR"; 
           if (["00", "01", "02", "05", "90"].includes(version)) return ""; // Retorna vazio para estas versões
           return "N/A"; // Retorna N/A se for grupo 013 mas não for SKF nem as versões acima
         }
@@ -609,19 +611,19 @@
         const groupVal = getSelectedText(groupSelect);
         const versionVal = getSelectedText(versionSelect);
         const subCategoryVal = getSelectedText(subcategorySelect);
-        const brandVal = getSelectedText(brandSelect);
+        const projectSelectVal = getSelectedText(projectSelect);
 
         // Logs para verificar valores
-        console.log("Valores lidos:", { groupVal, versionVal, subCategoryVal, brandVal });
+        console.log("Valores lidos:", { groupVal, versionVal, subCategoryVal, projectSelectVal });
 
         if (kitTransInput) kitTransInput.value = calculateKitTrans(groupVal, versionVal);
         if (correnteInput) correnteInput.value = calculateCorrente(groupVal, versionVal, subCategoryVal);
         if (raioInput) raioInput.value = calculateRaio(groupVal, versionVal);
-        if (cxDirecaoInput) cxDirecaoInput.value = calculateCxDirecao(groupVal, versionVal, brandVal);
+        if (cxDirecaoInput) cxDirecaoInput.value = calculateCxDirecao(groupVal, versionVal, projectSelectVal);
         if (cuboRodaInput) cuboRodaInput.value = calculateCuboRoda(groupVal, versionVal);
 
         calculateSCode(); // Atualiza S_Code sempre que os campos de versão são atualizados
-        
+
         // Log para ver o resultado
         console.log("Valores definidos:", { 
             kitTrans: kitTransInput?.value, 

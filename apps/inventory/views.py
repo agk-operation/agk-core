@@ -236,7 +236,6 @@ RELATED_MODELS = [
     'SupplierChain', 'Chain', 'Ncm',
     'BrandManufacturer', 'ModelApplication', 'Currency',
     'Group', 'Version', 'Supplier', 'ColItem', 'Application',
-    'VersaoKitTrans', 'VersaoCuboRoda', 'VersaoCxDirecao', 'VersaoRaio', 'VersaoCorrente',
 ]
 
 for model_name in RELATED_MODELS:

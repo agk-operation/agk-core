@@ -36,7 +36,7 @@ class ItemAdmin(admin.ModelAdmin):
                 ('Versões Calculadas', {
                     'classes': ('collapse',), # Opcional: começa recolhido
                     'fields': ('versao_kit_trans', 'versao_corrente', 'versao_raio', 
-                    'versao_cx_direcao', 'versao_cubo_roda')
+                    'versao_cx_direcao', 'versao_cubo_roda', 'english_description', 'sales_description'),
                  }),
                 ('Item Specifications' , {
                     'fields' : ('brand_manufacturer', 'ncm')

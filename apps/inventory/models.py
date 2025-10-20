@@ -121,11 +121,14 @@ class Application(models.Model): # Esse é o Model da tabela GP
 class Item(models.Model):
     p_code = models.CharField(max_length=50, unique=True)
     s_code = models.CharField(max_length=50)
+    
     versao_kit_trans = models.CharField(max_length=50, null=True)
     versao_cubo_roda = models.CharField(max_length=50, null=True)
     versao_cx_direcao = models.CharField(max_length=50, null=True)
     versao_raio = models.CharField(max_length=50, null=True)
     versao_corrente =models.CharField(max_length=50, null=True)
+    sales_description = models.TextField(blank=True, null=True)
+    english_description = models.TextField(blank=True, null=True)
 
     cost_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)

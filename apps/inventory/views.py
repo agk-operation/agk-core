@@ -121,12 +121,6 @@ CREATE_URLS = {
     'supplier':           'inventory:supplier-create',
     'col_item':           'inventory:col_item-create',
     'application':        'inventory:application-create',
-    'versao_kit_trans': 'inventory:versao_kit_trans-create',
-    'versao_cubo_roda': 'inventory:versao_cubo_roda-create',
-    'versao_cx_direcao': 'inventory:versao_cx_direcao-create',
-    'versao_raio': 'inventory:versao_raio-create',
-    'versao_corrente': 'inventory:versao_corrente-create',
-    
 }
 APP_FS_PREFIX   = 'itemmodelapplication_set'
 PACK_FS_PREFIX  = 'pack'

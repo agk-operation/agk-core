@@ -65,13 +65,14 @@
       </div>
     </div>
 
+    <!-- CARD: Versões Calculadas -->
      <div class="card mb-4">
       <div class="card-header fw-bold">Versões Calculadas</div>
       <div class="card-body">
         <div class="row g-3">
           {% for field in form %}
             {# Loop SÓ para os campos versao_* #}
-            {% if field.name in 'versao_kit_trans versao_corrente versao_raio versao_cx_direcao versao_cubo_roda' %}
+            {% if field.name in 'versao_kit_trans versao_corrente versao_raio versao_cx_direcao versao_cubo_roda sales_description english_description' %}
               <div class="col-md-6">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {# Renderiza o campo diretamente (já é TextInput readonly) #}
@@ -448,6 +449,9 @@
       const cxDirecaoInput = document.getElementById('id_versao_cx_direcao');
       const cuboRodaInput = document.getElementById('id_versao_cubo_roda');
       const sCodeInput = document.getElementById('id_s_code');
+      const salesDescriptionTextarea = document.getElementById('id_sales_description');
+      const englishDescriptionInput = document.getElementById('id_english_description');
+      const modelApplicationSelect = document.getElementById('id_model_application');
 
       // 2. Função auxiliar getSelectedText (definir uma vez)
       const getSelectedText = (selectElement) => {
@@ -603,6 +607,31 @@
            console.log("S Code calculado:", generatedSCode); // Log para depuração
         }
 
+        
+
+      function updateSalesDescription() {
+              // Pega o valor do input diretamente
+              const englishDescVal = englishDescriptionInput ? englishDescriptionInput.value : ""; // V value
+      
+              // Tenta pegar o PRIMEIRO dropdown de model_application do formset
+              const firstModelAppSelect = document.querySelector('select[name^="itemmodelapplication_set-"][name$="-model_application"]');
+              const modelAppText = getSelectedText(firstModelAppSelect); // AE selected text (do primeiro)
+      
+              let finalDescription = englishDescVal; // Default to just V
+      
+              // Verifica se AE (do primeiro) tem valor
+              if (modelAppText && modelAppText !== "------") {
+                finalDescription = `${englishDescVal} - ${modelAppText}`;
+              }
+            
+              // Atualiza o campo Sales Description
+              if (salesDescriptionTextarea) {
+                salesDescriptionTextarea.value = finalDescription;
+              }
+            
+              console.log("Sales Description Updated:", finalDescription);
+            }
+
       // 5. Função para atualizar Campos de Versão
       function updateVersionFields() {
         // Log para depuração
@@ -647,9 +676,25 @@
         if (field) field.addEventListener('change', updateVersionFields);
       });
 
+      // Ouvintes para Sales Description (CORRIGIDO)
+      if (englishDescriptionInput) {
+          englishDescriptionInput.addEventListener('input', updateSalesDescription); // Usa 'input'
+      }
+      // Adiciona um listener genérico para qualquer mudança nos selects do formset
+      const formsetTable = document.getElementById('model-application-grid');
+      if (formsetTable) {
+          formsetTable.addEventListener('change', function(event) {
+              // Verifica se a mudança foi em um select de model_application
+              if (event.target && event.target.tagName === 'SELECT' && event.target.name.endsWith('-model_application')) {
+                  updateSalesDescription();
+              }
+          });
+      }
+
       // 7. Chamadas Iniciais
       updatePCode();
       updateVersionFields();
+      updateSalesDescription();
 
       // --- CÓDIGO DO BOTÃO POPULATE ---
       const populateBtn = document.getElementById('populate-defaults-btn');

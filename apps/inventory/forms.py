@@ -41,6 +41,8 @@ class ItemForm(forms.ModelForm):
             'versao_cx_direcao':  forms.TextInput(attrs={'class': 'form-control'}),
             'versao_raio':  forms.TextInput(attrs={'class': 'form-control'}),
             'versao_corrente':  forms.TextInput(attrs={'class': 'form-control'}),
+            'sales_description': forms.TextInput(attrs={'class': 'form-control'}),
+            'english_description': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
     

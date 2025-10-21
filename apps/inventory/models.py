@@ -129,6 +129,7 @@ class Item(models.Model):
     versao_corrente =models.CharField(max_length=50, null=True)
     sales_description = models.TextField(blank=True, null=True)
     english_description = models.TextField(blank=True, null=True)
+    portuguese_description = models.TextField(blank=True, null=True)
 
     cost_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -145,6 +146,7 @@ class Item(models.Model):
     supplier_chain = models.ForeignKey(SupplierChain, on_delete=models.PROTECT)
     brand_manufacturer = models.ForeignKey(BrandManufacturer, on_delete=models.PROTECT)
     application = models.ForeignKey(Application, on_delete=models.PROTECT, null=True, blank=True)
+    
 
     chain = models.ForeignKey(Chain, on_delete=models.PROTECT)
     ncm = models.ForeignKey(Ncm, on_delete=models.PROTECT)

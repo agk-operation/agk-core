@@ -43,6 +43,7 @@ class ItemForm(forms.ModelForm):
             'versao_corrente':  forms.TextInput(attrs={'class': 'form-control'}),
             'sales_description': forms.TextInput(attrs={'class': 'form-control'}),
             'english_description': forms.TextInput(attrs={'class': 'form-control'}),
+            'portuguese_description': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
     

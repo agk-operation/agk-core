@@ -6,6 +6,20 @@
 
 {% block content %}
 <div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="display-6 m-0">{{ object.pk|yesno:"Edit,Add New" }} Item</h3>
+    
+    <button id="populate-defaults-btn" class="btn btn-outline-primary btn-sm">
+      <i class="fas fa-magic"></i> Popular Dados Padrão
+    </button>
+  </div>
+  
+  <form method="post" novalidate>
+    {% csrf_token %}
+    ...
+  </form>
+</div>
+<div class="container mt-4">
   <h3 class="display-6">{{ object.pk|yesno:"Edit,Add New" }} Item</h3>
 
   {% if form.non_field_errors %}
@@ -25,7 +39,7 @@
       <div class="card-body">
         <div class="row g-3">
           {% for field in form %}
-            {% if field.name in 'name category supplier subcategory project supplier_chain chain' %}
+            {% if field.name in 'name category supplier subcategory project supplier_chain chain group version col_item application' %}
               <div class="col-md-6">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 <div class="d-flex align-items-center gap-2">
@@ -41,6 +55,27 @@
                     </a>
                   {% endif %}
                 </div>
+                {% if field.errors %}
+                  <div class="text-danger">{{ field.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+     <div class="card mb-4">
+      <div class="card-header fw-bold">Versões Calculadas</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for field in form %}
+            {# Loop SÓ para os campos versao_* #}
+            {% if field.name in 'versao_kit_trans versao_corrente versao_raio versao_cx_direcao versao_cubo_roda' %}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {# Renderiza o campo diretamente (já é TextInput readonly) #}
+                {{ field }}
                 {% if field.errors %}
                   <div class="text-danger">{{ field.errors }}</div>
                 {% endif %}
@@ -357,88 +392,275 @@
 
 
 {% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
-<script type="module">
-  import { setupEditLinks, setupFormsetEditLinks } from "{% static 'js/field_links.js' %}";
-  import { setupInlineFormset } from "{% static 'js/formset_manager.js' %}";
+  {{ block.super }} {# <--- Coloque o block.super AQUI no início #}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script> {# Mova imports externos para cá se necessário #}
 
-  setupEditLinks([
-    'category', 'subcategory', 'project',
-    'supplier', 'supplier_chain', 'chain',
-    'ncm', 'brand_manufacturer', 'currency'
-  ], '/inventory', {
-    brand_manufacturer: 'brandmanufacturer',
-    supplier_chain: 'supplierchain'
-  });
+  {# Seus imports de module continuam aqui #}
+  <script type="module">
+    import { setupEditLinks, setupFormsetEditLinks } from "{% static 'js/field_links.js' %}";
+    import { setupInlineFormset } from "{% static 'js/formset_manager.js' %}";
+    // ... (seu código setupEditLinks, etc.)
+  </script>
 
-  setupFormsetEditLinks('model_application', '/inventory', {
-    model_application: 'modelapplication'
-  });
+  {# Agora, UM ÚNICO script para todo o resto #}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      
+      // --- CÓDIGO DO PACKING FORMSET ---
+      const addBtn = document.getElementById('add-pack-version-btn');
+      if (addBtn) { // Adiciona verificação se o botão existe
+         const container = document.getElementById('new-versions-container');
+         const totalFormsInput = document.getElementById('id_pack-TOTAL_FORMS');
+         const initialFormsInput= document.getElementById('id_pack-INITIAL_FORMS');
+         const emptyTemplate = document.getElementById('empty-pack-form-template')?.innerHTML; // '?' para segurança
 
+         if (container && totalFormsInput && initialFormsInput && emptyTemplate) {
+            const initialCount = parseInt(initialFormsInput.value, 10);
 
-  setupInlineFormset({
-    gridId: 'model-application-grid',
-    addButtonId: 'add-model-application',
-    emptyFormId: 'empty-form-template',
-    totalFormsId: 'id_itemmodelapplication_set-TOTAL_FORMS',
-    rowClass: 'formset-row',
-    removeButtonClass: 'remove-model-row'
-  });
-</script>
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  const addBtn           = document.getElementById('add-pack-version-btn');
-  const container        = document.getElementById('new-versions-container');
-  const totalFormsInput  = document.getElementById('id_pack-TOTAL_FORMS');
-  const initialFormsInput= document.getElementById('id_pack-INITIAL_FORMS');
-  const emptyTemplate    = document.getElementById('empty-pack-form-template').innerHTML;
+            function updateIndexes() { /* ... sua função updateIndexes ... */ }
+            
+            addBtn.addEventListener('click', () => { /* ... seu código addBtn ... */ });
 
-  // Quantas versões já existiam (INITIAL_FORMS)
-  const initialCount = parseInt(initialFormsInput.value, 10);
+            container.addEventListener('click', function(e){ /* ... seu código container click ... */ });
+         } else {
+             console.warn("Elementos do formset de Packing não encontrados.");
+         }
+      } else {
+          console.warn("Botão 'add-pack-version-btn' não encontrado.");
+      }
 
-  // Função para reindexar todos os novos forms depois de remoção
-  function updateIndexes() {
-    const newForms = container.querySelectorAll('.pack-form');
-    newForms.forEach((formDiv, idx) => {
-      // Novo índice = initialCount + idx
-      const newIndex = initialCount + idx;
-      formDiv.dataset.index = newIndex;
-      // Para cada input/select/textarea e label, troque pack-N- por pack-newIndex-
-      formDiv.querySelectorAll('input, select, textarea, label').forEach(el => {
-        if (el.name) {
-          el.name = el.name.replace(/pack-\d+-/, `pack-${newIndex}-`);
+      // --- CÓDIGO DO P_CODE E VERSÕES AUTOMÁTICAS ---
+
+      // 1. Referências (coloque todas juntas)
+      const groupSelect = document.getElementById('id_group');
+      const applicationSelect = document.getElementById('id_application'); // Você usa isso no P_Code
+      const supplierSelect = document.getElementById('id_supplier');
+      const itemSelect = document.getElementById('id_col_item');
+      const versionSelect = document.getElementById('id_version');
+      const pCodeInput = document.getElementById('id_p_code');
+      const categorySelect = document.getElementById('id_category');
+      const subcategorySelect = document.getElementById('id_subcategory');
+      const brandSelect = document.getElementById('id_brand_manufacturer');
+      const projectSelect = document.getElementById('id_project');
+      const kitTransInput = document.getElementById('id_versao_kit_trans');
+      const correnteInput = document.getElementById('id_versao_corrente');
+      const raioInput = document.getElementById('id_versao_raio');
+      const cxDirecaoInput = document.getElementById('id_versao_cx_direcao');
+      const cuboRodaInput = document.getElementById('id_versao_cubo_roda');
+      const sCodeInput = document.getElementById('id_s_code');
+
+      // 2. Função auxiliar getSelectedText (definir uma vez)
+      const getSelectedText = (selectElement) => {
+        if (!selectElement || selectElement.value === "") return "";
+        // Verifica se há uma opção selecionada antes de acessar 'text'
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        return selectedOption ? selectedOption.text : ""; 
+      };
+
+      // 3. Funções de Cálculo (tradução das fórmulas)
+      function calculateKitTrans(group, version) {
+        if (group === "001") {
+          const versionsK = ["H1", "H9", "H7", "00", "H0", "00F", "HF", "01", "02", "01G", "03SG", "H50", "50", "HB", "03", "H3"];
+          const versionsR = ["H1UX", "04", "H4", "08", "01HO", "01HX", "01UX", "01O", "01SX", "01VO", "01X"];
+          const versionsSK = ["00K", "10S"];
+          const versionsP = ["F9P", "01P"];
+          const versionsC = ["F9C", "00C", "01C"];
+
+          if (versionsK.includes(version)) return "K";
+          if (versionsR.includes(version)) return "R";
+          if (versionsSK.includes(version)) return "SK";
+          if (versionsP.includes(version)) return "P";
+          if (versionsC.includes(version)) return "C";
+          return ""; // Retorna vazio se grupo for 001 mas a versão não bate
         }
-        if (el.id) {
-          el.id   = el.id.replace(/id_pack-\d+-/, `id_pack-${newIndex}-`);
+        return "N/A"; // Retorna N/A se grupo não for 001
+      }
+
+      function calculateCorrente(group, version, subcategory) {
+        if (group === "002") {
+          // Ajuste "Corrente de comando" se o texto exato for diferente no dropdown
+          if (subcategory === "Timming Chain" && version ==="00") return "CM"; 
+          if (version === "06") return "CD";
+          if (version === "R6") return "DR";
+          if (version === "07") return "CP"; // Verifica '07' primeiro
+          // Verifica a lista 'C' *sem* o '07' que já foi tratado
+          if (["00", "03", "50", "90"].includes(version)) return "C"; 
+          if (["01", "02",  "04", "91"].includes(version)) return "R";
+          if (version === "99") return "M";
+          return "N/A"; // Retorna N/A se grupo for 002 mas nenhuma condição bateu
         }
-        if (el.htmlFor) {
-          el.htmlFor = el.htmlFor.replace(/id_pack-\d+-/, `id_pack-${newIndex}-`);
+        return "N/A"; // Retorna N/A se grupo não for 002
+      }
+
+      function calculateRaio(group, version) {
+        if (group === "025") {
+          switch (version) {
+            case "00N": return "N";
+            case "00": return "RZ";
+            case "01": return "RC";
+            case "02": return "RS";
+            case "03": return "RC4";
+            case "04": return "RC4R";
+            case "05": return "RZ4";
+            case "06": return "RZ4R";
+            case "07": return "RS4R";
+            default: return "N/A"; // Valor padrão se a versão não for nenhuma das listadas
+          }
         }
+        return "N/A"; // Retorna N/A se grupo não for 025
+      }
+
+      function calculateCxDirecao(group, version, project) {
+        console.log("calculateCxDirecao chamado com:", { group, version, project }); // Log para depuração
+        if (group === "013") {
+          // Ajuste "SKF" se o texto exato for diferente no dropdown
+          if (project === "SKF") return "CR"; 
+          if (["00", "01", "02", "05", "90"].includes(version)) return ""; // Retorna vazio para estas versões
+          return "N/A"; // Retorna N/A se for grupo 013 mas não for SKF nem as versões acima
+        }
+        return "N/A"; // Retorna N/A se grupo não for 013
+      }
+
+      function calculateCuboRoda(group, version) {
+        if (group === "034") {
+          if (version === "01") return "R";
+          if (["00", "04", "90"].includes(version)) return ""; // Retorna vazio para estas versões
+          return "N/A"; // Retorna N/A se for grupo 034 mas não for 01 nem as versões acima
+        }
+        return "N/A"; // Retorna N/A se grupo não for 034
+      }
+
+      // 4. Função para atualizar P_Code
+      function updatePCode() {
+        const groupVal = getSelectedText(groupSelect);
+        const modelVal = getSelectedText(applicationSelect); // <- Certifique-se que 'applicationSelect' é o correto para 'Model'
+        const supplierVal = getSelectedText(supplierSelect);
+        const itemVal = getSelectedText(itemSelect);
+        const versionVal = getSelectedText(versionSelect);
+
+        if (pCodeInput && groupVal && modelVal && supplierVal && itemVal && versionVal) {
+          const generatedCode = `${groupVal}-${modelVal}${supplierVal}-${itemVal}${versionVal}`;
+          pCodeInput.value = generatedCode;
+        } else if (pCodeInput) {
+           pCodeInput.value = ""; 
+        }
+        calculateSCode(); // Atualiza S_Code sempre que P_Code é atualizado
+      }
+
+      function calculateSCode() {
+          const groupVal = getSelectedText(groupSelect);
+          const itemVal = getSelectedText(itemSelect); // D = col_item
+          const versionVal = getSelectedText(versionSelect); // E = version
+
+          // Pega os valores *calculados* dos campos de versão
+          const kitTransVal = kitTransInput?.value || ""; // BY
+          const correnteVal = correnteInput?.value || ""; // BZ
+          const raioVal = raioInput?.value || "";       // CA
+          const cxDirecaoVal = cxDirecaoInput?.value || ""; // CB
+          const cuboRodaVal = cuboRodaInput?.value || "";   // CD
+
+          // **ASSUMINDO CC:** Não temos um campo CC definido. 
+          // Vou usar a 'versionVal' (E) como fallback, similar aos grupos 010/045/050.
+          // Se CC for outra coisa, ajuste aqui.
+          const ccVal = versionVal; 
+
+          let generatedSCode = ""; // Valor padrão
+
+          if (groupVal && itemVal) { // Precisa pelo menos do grupo e item
+              switch (groupVal) {
+                  case "034":
+                      generatedSCode = `${groupVal}${itemVal}${cuboRodaVal}`; // A + D + CD
+                      break;
+                  case "001":
+                      generatedSCode = `${groupVal}${itemVal}${kitTransVal}`; // A + D + BY
+                      break;
+                  case "002":
+                      generatedSCode = `${groupVal}${itemVal}${correnteVal}`; // A + D + BZ
+                      break;
+                  case "025":
+                      generatedSCode = `${groupVal}${itemVal}${raioVal}`;     // A + D + CA
+                      break;
+                  case "013":
+                      generatedSCode = `${groupVal}${itemVal}${cxDirecaoVal}`; // A + D + CB
+                      break;
+                  case "004":
+                      generatedSCode = `${groupVal}${itemVal}${ccVal}`;        // A + D + CC (usando E como CC)
+                      break;
+                  case "010":
+                  case "045":
+                  case "050":
+                      generatedSCode = `${groupVal}${itemVal}${versionVal}`;   // A + D + E
+                      break;
+                  default:
+                      generatedSCode = `${groupVal}${itemVal}`;              // A + D (Default)
+                      break;
+              }
+          }
+
+           if (sCodeInput) {
+              sCodeInput.value = generatedSCode;
+            }
+           console.log("S Code calculado:", generatedSCode); // Log para depuração
+        }
+
+      // 5. Função para atualizar Campos de Versão
+      function updateVersionFields() {
+        // Log para depuração
+        console.log("updateVersionFields foi chamada!"); 
+        
+        const groupVal = getSelectedText(groupSelect);
+        const versionVal = getSelectedText(versionSelect);
+        const subCategoryVal = getSelectedText(subcategorySelect);
+        const projectSelectVal = getSelectedText(projectSelect);
+
+        // Logs para verificar valores
+        console.log("Valores lidos:", { groupVal, versionVal, subCategoryVal, projectSelectVal });
+
+        if (kitTransInput) kitTransInput.value = calculateKitTrans(groupVal, versionVal);
+        if (correnteInput) correnteInput.value = calculateCorrente(groupVal, versionVal, subCategoryVal);
+        if (raioInput) raioInput.value = calculateRaio(groupVal, versionVal);
+        if (cxDirecaoInput) cxDirecaoInput.value = calculateCxDirecao(groupVal, versionVal, projectSelectVal);
+        if (cuboRodaInput) cuboRodaInput.value = calculateCuboRoda(groupVal, versionVal);
+
+        calculateSCode(); // Atualiza S_Code sempre que os campos de versão são atualizados
+
+        // Log para ver o resultado
+        console.log("Valores definidos:", { 
+            kitTrans: kitTransInput?.value, 
+            corrente: correnteInput?.value,
+            raio: raioInput?.value,
+            cxDirecao: cxDirecaoInput?.value,
+            cuboRoda: cuboRodaInput?.value
+        });
+      }
+
+      // 6. Adicionar Ouvintes
+      // Ouvintes para P_Code
+      const pCodeTriggers = [groupSelect, applicationSelect, supplierSelect, itemSelect, versionSelect];
+      pCodeTriggers.forEach(field => {
+        if (field) field.addEventListener('change', updatePCode);
       });
-    });
-    // TOTAL_FORMS = initial + número de .pack-form
-    totalFormsInput.value = initialCount + newForms.length;
-  }
 
-  // Adicionar nova versão (mesmo código de antes)
-  addBtn.addEventListener('click', () => {
-    let formCount = parseInt(totalFormsInput.value, 10);
-    const html = emptyTemplate.replace(/__prefix__/g, formCount);
-    container.insertAdjacentHTML('beforeend', html);
-    totalFormsInput.value = formCount + 1;
-  });
+      // Ouvintes para Campos de Versão
+      const versionTriggers = [groupSelect, versionSelect, categorySelect, brandSelect];
+      versionTriggers.forEach(field => {
+        if (field) field.addEventListener('change', updateVersionFields);
+      });
 
-  // Delegação: remover versão quando clicar no botão
-  container.addEventListener('click', function(e){
-    if (e.target.classList.contains('remove-pack-version')) {
-      e.preventDefault();
-      const formDiv = e.target.closest('.pack-form');
-      if (!formDiv) return;
-      formDiv.remove();
-      updateIndexes();
-    }
-  });
-});
-</script>
+      // 7. Chamadas Iniciais
+      updatePCode();
+      updateVersionFields();
 
+      // --- CÓDIGO DO BOTÃO POPULATE ---
+      const populateBtn = document.getElementById('populate-defaults-btn');
+      if (populateBtn) {
+          function getCsrfToken() { /* ... sua função ... */ }
+          function updateDropdown(selectElement, data) { /* ... sua função ... */ }
+          populateBtn.addEventListener('click', function() { /* ... seu código do botão ... */ });
+      } else {
+          console.warn("Botão 'populate-defaults-btn' não encontrado.");
+      }
+
+    }); // Fim do DOMContentLoaded
+  </script>
 {% endblock %}

@@ -29,9 +29,15 @@ class ItemAdmin(admin.ModelAdmin):
 
     fieldsets = (
                 ('Basic Data', {
-                    'fields': ('name', 'category', 'subcategory', 
-                               'project', 'supplier', 'supplier_chain', 'chain')
+                    'fields': ('name', 'group', 'ColItem', 'version', 'category', 'subcategory', 
+                               'project', 'supplier', 'supplier_chain', 'chain', 'application',
+                               )
                 }),
+                ('Versões Calculadas', {
+                    'classes': ('collapse',), # Opcional: começa recolhido
+                    'fields': ('versao_kit_trans', 'versao_corrente', 'versao_raio', 
+                    'versao_cx_direcao', 'versao_cubo_roda')
+                 }),
                 ('Item Specifications' , {
                     'fields' : ('brand_manufacturer', 'ncm')
                 }),
@@ -103,4 +109,23 @@ class ModelApplicationAdmin(admin.ModelAdmin):
     search_fields = ('name', 'description')
     list_filter = ()
 
-    
+@admin.register(models.Group)
+class GroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+
+@admin.register(models.Version)
+class VersionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)    
+
+@admin.register(models.ColItem)
+class ColItemAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+
+@admin.register(models.Application)
+class ApplicationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)    
+

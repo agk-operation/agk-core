@@ -2,5 +2,14 @@ venv
 db.sqlite3
 media
 __pycache__/
+*.py[cod]
+*$py.class
 .DS_Store
 .env
+# Arquivos do VS Code
+.vscode/
+# Outros
+.DS_Store
+# Arquivos de log e uploads
+*.log
+/media/

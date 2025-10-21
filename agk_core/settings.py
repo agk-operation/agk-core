@@ -25,8 +25,6 @@ ENVIRONMENT = os.getenv('DJANGO_ENV', 'dev')
 
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
-DEBUG = True
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -54,6 +52,7 @@ INSTALLED_APPS = [
 
     'crispy_forms',
     'crispy_bootstrap5',
+    'django_select2',
 
     'apps.core',
     'apps.inventory',

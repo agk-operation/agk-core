@@ -11,7 +11,7 @@
         <div class="accordion-item">
           {% for hidden in sd.form.hidden_fields %}{{ hidden }}{% endfor %}
           <h2 class="accordion-header">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse"
+            <button class="accordion-button bg-light shadow-sm" type="button" data-bs-toggle="collapse"
                     data-bs-target="#stage{{ forloop.counter }}">{{ sd.stage.name }}</button>
           </h2>
           <div id="stage{{ forloop.counter }}" class="accordion-collapse collapse{% if f.errors %} show{% endif %}">

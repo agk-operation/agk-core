@@ -213,7 +213,7 @@
         <!-- 🔷 VERSÃO ATUAL -->
         {% for sub in packaging_fs.forms %}
           {% if sub.instance.pk and not sub.instance.valid_to %}
-            <div class="card border border-purple mb-3">
+            <div class="card border border-purple mb-3 version-atual">
               <div class="card-header text-white py-2" style="background-color: #6f42c1;">
                 <i class="fas fa-check-circle me-2"></i>Versão Atual
               </div>
@@ -257,8 +257,8 @@
 
     <!-- 🧩 TEMPLATE HIDDEN PARA JS CLONAR NOVAS VERSÕES -->
     <template id="empty-pack-form-template">
-      <div class="card border border-secondary-subtle mb-3 pack-form" data-index="__prefix__">
-        <div class="card-header bg-light text-dark py-2">
+      <div class="card nova-versao mb-3 pack-form" data-index="__prefix__">
+        <div class="card-header py-2">
           <i class="fas fa-layer-group me-1"></i>Nova Versão
         </div>
         <div class="card-body py-2">
@@ -426,6 +426,11 @@ document.addEventListener('DOMContentLoaded', function(){
     const html = emptyTemplate.replace(/__prefix__/g, formCount);
     container.insertAdjacentHTML('beforeend', html);
     totalFormsInput.value = formCount + 1;
+
+    const atualCard = document.querySelector('.card.version-atual');
+    if (atualCard) {
+      atualCard.classList.add('inativa');
+    }
   });
 
   // Delegação: remover versão quando clicar no botão

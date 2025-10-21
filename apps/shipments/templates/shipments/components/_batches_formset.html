@@ -1,76 +1,73 @@
-{# Batches (formset) #}
-<h5>Batches</h5>
-{{ batch_fs.management_form }}
-{% if batch_fs.non_form_errors %}
-  <div class="alert alert-danger">{{ batch_fs.non_form_errors }}</div>
-{% endif %}
+ <div class="accordion mb-4" id="batchFormAccordion">
+  <div class="accordion-item accordion-batch">
+    <h2 class="accordion-header" id="batchFormHeading">
+          <button class="accordion-button bg-light shadow-sm" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#batchFormCollapse" aria-expanded="true">
+            Batches
+          </button>
+    </h2>
+    <div id="batchFormCollapse" class="accordion-collapse collapse show" data-bs-parent="#batchFormAccordion">
 
-<table class="table">
-  <thead>
-    <tr>
-      <th>Batch</th>
-      {% if not read_only %}<th>Ações</th>{% endif %}
-    </tr>
-  </thead>
-  <tbody id="batches-grid">
-    {% for sub in batch_fs.forms %}
-      <tr class="batch-row">
-        <td>
-          {% if not read_only %}
-            {% if sub.instance.pk %}{{ sub.id }}{% endif %}
-            {{ sub.order_batch }} {{ sub.order_batch.errors }}
-          {% else %}
-            {{ sub.instance.order_batch }}
-          {% endif %}
-          {% if sub.non_field_errors %}
-            <div class="text-danger small">{{ sub.non_field_errors }}</div>
-          {% endif %}
-        </td>
-        {% if not read_only %}
-        <td>
-          {% if sub.instance.pk %}
-            {{ sub.DELETE }} <small>Excluir</small>
-          {% else %}
-            <button type="button" class="btn btn-sm btn-danger remove-row">–</button>
-          {% endif %}
-        </td>
-        {% endif %}
-      </tr>
-    {% empty %}
-      <tr><td colspan="3">No batch.</td></tr>
-    {% endfor %}
-    {# Linha-templete para inserir novas entradas do formset #}
-    <tr class="batch-row d-none">
-      {% for hidden in batch_fs.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
-      <td>{{ batch_fs.empty_form.order_batch }}</td>
-      <td><button type="button" class="btn btn-sm btn-danger remove-row">–</button></td>
-    </tr>
-  </tbody>
-</table>
+      {{ batch_fs.management_form }}
 
-{% if not read_only %}
-  <button id="add-batch" class="btn btn-secondary btn-sm mb-4">+ Add Batch</button>
-{% endif %}
+      {% if batch_fs.non_form_errors %}
+        <div class="alert alert-danger">{{ batch_fs.non_form_errors }}</div>
+      {% endif %}
 
-{# JS de clonagem (igual ao seu) #}
-<script>
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const addBtn   = document.getElementById('add-batch');
-    const grid     = document.getElementById('batches-grid');
-    const total    = document.getElementById('id_sb-TOTAL_FORMS');
-    const template = grid.querySelector('.batch-row.d-none')?.outerHTML;
+      <div class="row" id="batches-grid">
+        {% for form in batch_fs.forms %}
+          <div class="col-md-6 batch-row mb-3">
+            <div class="card border {% if form.instance.pk %}border-success{% else %}border-secondary{% endif %}">
+              <div class="card-body py-2">
+                {% if not read_only %}
+                  {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                  <div class="mb-2">
+                    <label class="form-label">{{ form.order_batch.label }}</label>
+                    {{ form.order_batch }}
+                    {% if form.order_batch.errors %}
+                      <div class="text-danger small mt-1">{{ form.order_batch.errors }}</div>
+                    {% endif %}
+                  </div>
+                  {% if form.DELETE %}
+                    <div class="text-end">{{ form.DELETE }} <label>Excluir</label></div>
+                  {% else %}
+                    <div class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-danger remove-row">Remover</button>
+                    </div>
+                  {% endif %}
+                {% else %}
+                  <p class="mb-0"><strong>Lote:</strong> {{ form.instance.order_batch }}</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
 
-    addBtn?.addEventListener('click', ()=>{
-      let count = parseInt(total.value,10);
-      const row = template.replace(/__prefix__/g, count).replace('d-none','');
-      grid.insertAdjacentHTML('beforeend', row);
-      total.value = count + 1;
-    });
+      {% if not read_only %}
+      <div>
+        <button id="add-batch" type="button" class="btn btn-outline-primary btn-sm">
+          <i class="fas fa-plus me-1"></i>Adicionar Lote
+        </button>
+      </div>
+      {% endif %}
 
-    grid.addEventListener('click', e=>{
-      if(e.target.closest('.remove-row')){
-        e.target.closest('.batch-row').remove();
-      }
-    });
-  });
-</script>
+      <template id="batch-empty-template">
+        <div class="col-md-6 batch-row mb-3">
+          <div class="card border border-secondary">
+            <div class="card-body py-2">
+              {% for hidden in batch_fs.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+              <div class="mb-2">
+                <label class="form-label">{{ batch_fs.empty_form.order_batch.label }}</label>
+                {{ batch_fs.empty_form.order_batch }}
+              </div>
+                <div class="text-end">
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-row">Remover</button>
+                </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>

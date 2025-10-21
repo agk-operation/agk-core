@@ -2,8 +2,11 @@
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Submit, Field
+from django_select2.forms import ModelSelect2Widget
 from django import forms
 from django.forms.models import inlineformset_factory, BaseInlineFormSet
+
+from apps.orders.models import OrderBatch
 
 from .models import Shipment, ShipmentBatch, ShipmentStage, Stage
 
@@ -51,28 +54,23 @@ class ShipmentForm(forms.ModelForm):
 class ShipmentBatchForm(forms.ModelForm):
     class Meta:
         model = ShipmentBatch
-        fields = ['order_batch']  # ou os campos necessários
+        fields = ['order_batch']
         widgets = {
-            'order_batch': forms.Select(attrs={'class': 'form-control form-control-sm'}),
+            'order_batch': forms.Select(attrs={
+                'class': 'form-select select2',
+                'data-placeholder': 'Selecione um lote'
+            })
         }
 
-    def clean_order_batch(self):
-        order_batch = self.cleaned_data.get('order_batch')
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        # só valida se order_batch foi preenchido
-        if not order_batch:
-            return order_batch
+        self.fields['order_batch'].queryset = OrderBatch.objects.filter(status='pre')
 
-        # se está editando, ignore ele mesmo
-        if self.instance.pk:
-            existing = ShipmentBatch.objects.filter(order_batch=order_batch).exclude(pk=self.instance.pk)
-        else:
-            existing = ShipmentBatch.objects.filter(order_batch=order_batch)
+        self.fields['order_batch'].label_from_instance = lambda obj: (
+            f"{obj.batch_code}"
+        )
 
-        if existing.exists():
-            raise forms.ValidationError("Este lote já está vinculado a outro pré-embarque.")
-
-        return order_batch
 
 
 class BaseShipmentBatchFormSet(BaseInlineFormSet):
@@ -100,7 +98,7 @@ ShipmentBatchFormSet = inlineformset_factory(
     ShipmentBatch,
     form=ShipmentBatchForm,
     formset=BaseShipmentBatchFormSet,
-    extra=1,
+    extra=0,
     can_delete=True
 )
 
@@ -180,7 +178,7 @@ class ShipmentStageForm(forms.ModelForm):
                 value = self.data.get(self.add_prefix(fname), None)
                 field.initial = value
             else:
-                field.initial = getattr(shipment, fname)
+                field.initial = getattr(shipment, fname, None)
 
             field.widget.attrs.update({
                 'class': 'form-control form-control-sm',

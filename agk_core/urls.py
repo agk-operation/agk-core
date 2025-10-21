@@ -13,6 +13,8 @@ urlpatterns = [
     path('orders/', include('apps.orders.urls')), 
     path('finance/', include('apps.finance.urls')),
     path('shipments/', include('apps.shipments.urls')),
+    
+    path("select2/", include("django_select2.urls")),
 
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),

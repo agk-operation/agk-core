@@ -7,6 +7,11 @@
   Shipment {{ object.pk|default:"Novo" }}
 {% endblock %}
 
+{% block head_extra %}
+  {{ block.super }}
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{% endblock %}
+
 {% block content %}
 <div class="container py-5">
 
@@ -20,7 +25,7 @@
     <div class="accordion mb-4" id="mainFormAccordion">
       <div class="accordion-item accordion-main">
         <h2 class="accordion-header" id="mainFormHeading">
-          <button class="accordion-button shadow-sm" type="button"
+          <button class="accordion-button bg-light shadow-sm" type="button"
                   data-bs-toggle="collapse" data-bs-target="#mainFormCollapse" aria-expanded="true">
             {% if phase == 'pre' %}Dados do Pré-Embarque{% else %}Dados Finais{% endif %}
           </button>
@@ -66,4 +71,10 @@
     </div>
   </form>
 </div>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>  
+  <script src="{% static 'js/shipment_batch_formsets.js' %}"></script>
 {% endblock %}

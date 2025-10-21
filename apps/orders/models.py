@@ -178,7 +178,6 @@ class OrderBatch(models.Model):
         ('negotiation', 'In Negotiation'),
         ('production', 'In Production'),
         ('pre', 'Pre Shipment'),
-        ('pre', 'Pre Shipment'),
         ('transit', 'In Transit'),
         ('delivered', 'Delivered'),
         ('stb', 'Stand by'),

@@ -1,8 +1,10 @@
 from django.db import models
 from apps.orders.models import OrderBatch
+from apps.core.models import Agent, Carrier, Port, City
+
 
 class Shipment(models.Model):
-    # → status da “fase” (pré ou final)
+    # Status Choices...
     STATUS_PRELOADING = 'PRE'
     STATUS_READY = 'RDY'
     STATUS_SHIPPED = 'SHP'
@@ -12,45 +14,94 @@ class Shipment(models.Model):
         (STATUS_SHIPPED, 'Shipped'),
     ]
 
-    created_at  = models.DateTimeField(auto_now_add=True)
-    updated_at  = models.DateTimeField(auto_now=True)
-    status      = models.CharField(max_length=3, choices=STATUS_CHOICES, default=STATUS_PRELOADING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=3, choices=STATUS_CHOICES, default=STATUS_PRELOADING)
 
-    pol = models.CharField("Port of Loading", max_length=100, blank=True)  
-    pod = models.CharField("Port of Destination", max_length=100, blank=True) 
+    pol = models.ForeignKey(
+        Port, 
+        on_delete=models.PROTECT, 
+        verbose_name="Port of Loading", 
+        max_length=100, 
+        blank=True,
+        related_name="shipments_pol"  # ✅ unique related_name
+    )
+    pod = models.ForeignKey(
+        Port, 
+        on_delete=models.PROTECT, 
+        verbose_name="Port of Destination", 
+        max_length=100, 
+        blank=True,
+        related_name="shipments_pod"  # ✅ unique related_name
+    )
     signer = models.CharField("Signer", max_length=100, blank=True)
     leader = models.CharField("Leader", max_length=100, blank=True)
     customer_reference = models.CharField("Customer Ref.", max_length=100, blank=True)
 
     loading_date = models.DateTimeField(null=True)
     shipping_date = models.DateField(null=True, blank=True)
-    cons_point = models.CharField("Consolidation Point", max_length=100, blank=True)
-    city = models.CharField("City", max_length=100, blank=True)
-    pol = models.CharField("Port of Loading", max_length=100, blank=True)
+
+    cons_point = models.ForeignKey(
+        City, 
+        on_delete=models.PROTECT, 
+        verbose_name="Consolidation Point", 
+        max_length=100, 
+        blank=True,
+        related_name="shipments_cons_point"  # ✅ unique related_name
+    )
+    city = models.ForeignKey(
+        City, 
+        on_delete=models.PROTECT, 
+        verbose_name="City", 
+        max_length=100, 
+        blank=True,
+        related_name="shipments_city"  # ✅ unique related_name
+    )
+
     shp_doc = models.FileField(
         "Shipping Document", 
         upload_to='shipment_document/%Y/%m/%d/', 
         blank=True, 
         null=True
     )
-    carrier = models.CharField("Carrier", max_length=200, blank=True)
-    origin_agent = models.CharField("Origin Agent", max_length=200, blank=True)
-    destination_agent = models.CharField("Destination Agent", max_length=200, blank=True)
-    agents_note =  models.TextField(blank=True)
+    carrier = models.ForeignKey(
+        Carrier, 
+        on_delete=models.PROTECT, 
+        verbose_name="Carrier", 
+        max_length=200, 
+        blank=True,
+        related_name="shipments"  # Optional: add related_name here too
+    )
+    origin_agent = models.ForeignKey(
+        Agent, 
+        on_delete=models.PROTECT, 
+        verbose_name="Origin Agent",
+        related_name="shipments_origin"  # ✅ unique related_name
+    )
+    destination_agent = models.ForeignKey(
+        Agent, 
+        on_delete=models.PROTECT, 
+        verbose_name="Destination Agent",
+        related_name="shipments_destination"  # ✅ unique related_name
+    )
+
+    agents_note = models.TextField(blank=True)
     tracking_number = models.CharField("Tracking Number", max_length=200, blank=True)
+
     booking = models.FileField(
         "Booking Document", 
         upload_to='booking_document/%Y/%m/%d/', 
         blank=True, 
         null=True
     )
+
     notes = models.TextField(blank=True)
     bl_number = models.CharField("B.L Number", max_length=200, blank=True)
     bl_date = models.DateTimeField("B.L Date", null=True)
     inspection_no = models.CharField("Inspection Number", max_length=200, blank=True)
     eta_destination = models.DateField("E.T.A", null=True, blank=True)
     ata_destination = models.DateField("A.T.A", null=True, blank=True)
-     
+
     batches = models.ManyToManyField(
         OrderBatch,
         through='ShipmentBatch',
@@ -60,15 +111,15 @@ class Shipment(models.Model):
     @property
     def is_preloading(self): 
         return self.status == self.STATUS_PRELOADING
-    
+
     @property
     def is_ready(self):
         return self.status == self.STATUS_READY
-    
+
     @property
     def is_shipped(self): 
         return self.status == self.STATUS_SHIPPED
-    
+
     def is_pre_phase_completed(self):
         required_fields = [
             self.cons_point,
@@ -86,6 +137,7 @@ class Shipment(models.Model):
 
     def __str__(self):
         return f"Shipment #{self.pk} ({self.get_status_display()})"
+
 
 
 class ShipmentBatch(models.Model):

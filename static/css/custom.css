@@ -77,3 +77,23 @@
   .border-purple {
   border-color: #6f42c1 !important;
 }
+/* Versão atual quando nova versão é adicionada */
+.card.version-atual.inativa {
+  opacity: 0.6;
+  filter: grayscale(20%);
+}
+
+/* Nova versão destacada */
+.card.nova-versao {
+  border: 2px dashed #0d6efd;
+  background-color: #f0f8ff;
+}
+
+.card.nova-versao .card-header {
+  background-color: #0d6efd !important;
+  color: white !important;
+}
+
+.card.nova-versao .card-body {
+  background-color: #f8fbff;
+}
